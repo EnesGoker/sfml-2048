@@ -142,7 +142,13 @@ jobs:
 
       - name: Configure (Release, Windows)
         if: runner.os == 'Windows'
-        run: cmake --preset vcpkg-release
+        shell: pwsh
+        run: |
+          cmake `
+            -S . `
+            -B build/vcpkg-release `
+            -DCMAKE_BUILD_TYPE=Release `
+            -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake"
 
       - name: Build (Release, Linux/macOS)
         if: runner.os != 'Windows'
@@ -150,7 +156,7 @@ jobs:
 
       - name: Build (Release, Windows)
         if: runner.os == 'Windows'
-        run: cmake --build --preset build-vcpkg-release --config Release
+        run: cmake --build build/vcpkg-release --config Release
 
       - name: Test (Release, Linux/macOS)
         if: runner.os != 'Windows'

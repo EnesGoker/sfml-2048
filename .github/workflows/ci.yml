@@ -238,7 +238,13 @@ jobs:
 
       - name: Configure (Windows)
         if: runner.os == 'Windows'
-        run: cmake --preset vcpkg-debug
+        shell: pwsh
+        run: |
+          cmake `
+            -S . `
+            -B build/vcpkg-debug `
+            -DCMAKE_BUILD_TYPE=Debug `
+            -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake"
 
       - name: Build (Linux/macOS)
         if: runner.os != 'Windows'
@@ -246,7 +252,7 @@ jobs:
 
       - name: Build (Windows)
         if: runner.os == 'Windows'
-        run: cmake --build --preset build-vcpkg-debug --config Debug
+        run: cmake --build build/vcpkg-debug --config Debug
 
       - name: Test (Linux/macOS)
         if: runner.os != 'Windows'
