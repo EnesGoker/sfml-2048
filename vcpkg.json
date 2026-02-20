@@ -2,7 +2,7 @@
   "name": "sfml-2048",
   "version-string": "0.1.0",
   "description": "2048 desktop game in C++ with SFML",
-  "builtin-baseline": "dd930e314f529c86d2703a60d5ea7dd6573d9e5a",
+  "builtin-baseline": "66c0373dc7fca549e5803087b9487edfe3aca0a1",
   "dependencies": [
     "sfml"
   ],

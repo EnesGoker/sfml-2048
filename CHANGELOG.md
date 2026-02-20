@@ -54,6 +54,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - Core tile spawn RNG now uses an implementation-independent bounded sampler for cross-platform deterministic seed behavior.
 - CI coverage filter paths now use workspace-relative regexes to avoid platform/path encoding mismatches.
 - CI static-analysis now reports clang-tidy warnings without hard-failing on warning-level findings.
+- GitHub Actions workflow actions were upgraded to latest major versions (`checkout@v6`, `cache@v5`, `download-artifact@v7`, `upload-artifact@v6`).
+- vcpkg baseline pin was updated to `66c0373dc7fca549e5803087b9487edfe3aca0a1`.
 
 ### Removed
 - Committed build artifacts (`*.o`, local binaries, `.DS_Store`).

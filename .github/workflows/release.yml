@@ -14,7 +14,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Ensure tag matches VERSION file
         run: |
@@ -37,7 +37,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup CMake
         uses: lukka/get-cmake@latest
@@ -73,7 +73,7 @@ jobs:
 
       - name: Restore ccache (Linux/macOS)
         if: runner.os != 'Windows'
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/.ccache
           key: ccache-release-${{ runner.os }}-${{ hashFiles('CMakeLists.txt', 'CMakePresets.json', 'src/**/*.cpp', 'src/**/*.hpp', 'tests/**/*.cpp', 'tests/**/*.hpp') }}
@@ -82,7 +82,7 @@ jobs:
 
       - name: Restore vcpkg archives (Linux/macOS)
         if: runner.os != 'Windows'
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/.cache/vcpkg/archives
           key: vcpkg-release-archives-${{ runner.os }}-${{ hashFiles('vcpkg.json') }}
@@ -91,7 +91,7 @@ jobs:
 
       - name: Restore vcpkg archives (Windows)
         if: runner.os == 'Windows'
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ${{ env.LOCALAPPDATA }}/vcpkg/archives
           key: vcpkg-release-archives-${{ runner.os }}-${{ hashFiles('vcpkg.json') }}
@@ -184,7 +184,7 @@ jobs:
         run: ccache --show-stats
 
       - name: Upload package artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: package-${{ matrix.os }}
           path: build/vcpkg-release/*.zip
@@ -198,7 +198,7 @@ jobs:
       contents: write
     steps:
       - name: Download package artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           path: dist
           pattern: package-*

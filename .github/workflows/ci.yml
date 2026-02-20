@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Install clang-format
         run: |
@@ -28,7 +28,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup CMake
         uses: lukka/get-cmake@latest
@@ -59,7 +59,7 @@ jobs:
             libfreetype6-dev
 
       - name: Restore ccache
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/.ccache
           key: ccache-static-analysis-${{ hashFiles('CMakeLists.txt', 'CMakePresets.json', 'src/**/*.cpp', 'src/**/*.hpp', 'tests/**/*.cpp', 'tests/**/*.hpp') }}
@@ -67,7 +67,7 @@ jobs:
             ccache-static-analysis-
 
       - name: Restore vcpkg archives
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/.cache/vcpkg/archives
           key: vcpkg-archives-static-analysis-${{ hashFiles('vcpkg.json') }}
@@ -131,7 +131,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup CMake
         uses: lukka/get-cmake@latest
@@ -167,7 +167,7 @@ jobs:
 
       - name: Restore ccache (Linux/macOS)
         if: runner.os != 'Windows'
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/.ccache
           key: ccache-${{ runner.os }}-${{ hashFiles('CMakeLists.txt', 'CMakePresets.json', 'src/**/*.cpp', 'src/**/*.hpp', 'tests/**/*.cpp', 'tests/**/*.hpp') }}
@@ -176,7 +176,7 @@ jobs:
 
       - name: Restore vcpkg archives (Linux/macOS)
         if: runner.os != 'Windows'
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/.cache/vcpkg/archives
           key: vcpkg-archives-${{ runner.os }}-${{ hashFiles('vcpkg.json') }}
@@ -185,7 +185,7 @@ jobs:
 
       - name: Restore vcpkg archives (Windows)
         if: runner.os == 'Windows'
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ${{ env.LOCALAPPDATA }}/vcpkg/archives
           key: vcpkg-archives-${{ runner.os }}-${{ hashFiles('vcpkg.json') }}
@@ -280,7 +280,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup CMake
         uses: lukka/get-cmake@latest
@@ -310,7 +310,7 @@ jobs:
             libfreetype6-dev
 
       - name: Restore ccache
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/.ccache
           key: ccache-sanitizers-${{ hashFiles('CMakeLists.txt', 'CMakePresets.json', 'src/**/*.cpp', 'src/**/*.hpp', 'tests/**/*.cpp', 'tests/**/*.hpp') }}
@@ -318,7 +318,7 @@ jobs:
             ccache-sanitizers-
 
       - name: Restore vcpkg archives
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/.cache/vcpkg/archives
           key: vcpkg-archives-sanitizers-${{ hashFiles('vcpkg.json') }}
@@ -366,7 +366,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup CMake
         uses: lukka/get-cmake@latest
@@ -397,7 +397,7 @@ jobs:
             libfreetype6-dev
 
       - name: Restore ccache
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/.ccache
           key: ccache-coverage-${{ hashFiles('CMakeLists.txt', 'CMakePresets.json', 'src/**/*.cpp', 'src/**/*.hpp', 'tests/**/*.cpp', 'tests/**/*.hpp') }}
@@ -405,7 +405,7 @@ jobs:
             ccache-coverage-
 
       - name: Restore vcpkg archives
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/.cache/vcpkg/archives
           key: vcpkg-archives-coverage-${{ hashFiles('vcpkg.json') }}
@@ -455,7 +455,7 @@ jobs:
             --fail-under-line 80
 
       - name: Upload coverage artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: coverage-report
           path: |
