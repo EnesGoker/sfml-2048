@@ -1,10 +1,16 @@
 # 2048 Project (C++ / SFML)
 
+[![CI](https://github.com/EnesGoker/sfml-2048/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/EnesGoker/sfml-2048/actions/workflows/ci.yml)
+[![Release](https://github.com/EnesGoker/sfml-2048/actions/workflows/release.yml/badge.svg)](https://github.com/EnesGoker/sfml-2048/actions/workflows/release.yml)
+[![License](https://img.shields.io/github/license/EnesGoker/sfml-2048)](LICENSE)
+
 A desktop implementation of 2048 written in C++. The goal of this repository is to evolve into an enterprise-grade portfolio project with reproducible builds, tests, CI, and release automation.
 
 ## Screenshot
 
-![Gameplay placeholder](docs/screenshots/gameplay-placeholder.svg)
+![Gameplay preview](docs/screenshots/gameplay-placeholder.svg)
+
+> Replace `docs/screenshots/gameplay-placeholder.svg` with a real screenshot or GIF for portfolio presentation.
 
 ## Current Features
 
@@ -100,7 +106,13 @@ GitHub Actions workflow: `.github/workflows/ci.yml`
 One-time branch protection setup (maintainer):
 
 ```bash
-./scripts/apply_branch_protection.sh <owner/repo>
+./scripts/apply_branch_protection.sh <owner/repo> single-maintainer
+```
+
+Team setup (enforced reviews + admin enforcement):
+
+```bash
+./scripts/apply_branch_protection.sh <owner/repo> team
 ```
 
 ## Engineering Docs
@@ -109,6 +121,7 @@ One-time branch protection setup (maintainer):
 - Testing strategy: `docs/testing.md`
 - Contribution guide: `CONTRIBUTING.md`
 - Security policy: `SECURITY.md`
+- Third-party notices: `THIRD_PARTY_NOTICES.md`
 
 ## Packaging and Release
 

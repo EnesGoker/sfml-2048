@@ -31,8 +31,9 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - Branch protection bootstrap script (`scripts/apply_branch_protection.sh`) for required checks and review gate.
 - PR template and structured issue forms for bug/feature intake.
 - Dependabot configuration for weekly GitHub Actions dependency updates.
-- Release artifacts now include `SHA256SUMS.txt` and SPDX SBOM (`sbom.spdx.json`).
+- Release artifacts now include `SHA256SUMS.txt` and SPDX SBOM files.
 - Property-style core tests for invariant preservation and left/right mirror symmetry.
+- Repository ownership and compliance inventory files: `.github/CODEOWNERS` and `THIRD_PARTY_NOTICES.md`.
 
 ### Changed
 - Standardized runtime font asset path to `assets/fonts/Geneva.ttf`.
@@ -56,6 +57,9 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - CI static-analysis now reports clang-tidy warnings without hard-failing on warning-level findings.
 - GitHub Actions workflow actions were upgraded to latest major versions (`checkout@v6`, `cache@v5`, `download-artifact@v7`, `upload-artifact@v6`).
 - vcpkg baseline pin was updated to `66c0373dc7fca549e5803087b9487edfe3aca0a1`.
+- Branch protection setup script now supports `single-maintainer` (safe default) and `team` profiles.
+- Release workflow now generates SPDX SBOM files from extracted package contents per platform artifact.
+- README now includes CI/release/license badges and clearer screenshot/branch-protection guidance.
 
 ### Removed
 - Committed build artifacts (`*.o`, local binaries, `.DS_Store`).

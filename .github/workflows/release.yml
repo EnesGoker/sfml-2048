@@ -214,9 +214,36 @@ jobs:
           curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b "$RUNNER_TEMP/bin"
           echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
 
-      - name: Generate SBOM (SPDX JSON)
+      - name: Extract package contents for SBOM
         run: |
-          syft dir:dist -o spdx-json=dist/sbom.spdx.json
+          mkdir -p dist/extracted dist/sbom
+          shopt -s nullglob
+          archives=(dist/*.zip)
+          if [ ${#archives[@]} -eq 0 ]; then
+            echo "No ZIP artifacts found in dist/"
+            exit 1
+          fi
+
+          for archive in "${archives[@]}"; do
+            package_name="$(basename "$archive" .zip)"
+            extract_dir="dist/extracted/${package_name}"
+            mkdir -p "$extract_dir"
+            unzip -q "$archive" -d "$extract_dir"
+          done
+
+      - name: Generate SBOM files (SPDX JSON)
+        run: |
+          shopt -s nullglob
+          extracted_dirs=(dist/extracted/*)
+          if [ ${#extracted_dirs[@]} -eq 0 ]; then
+            echo "No extracted package directories found in dist/extracted/"
+            exit 1
+          fi
+
+          for extract_dir in "${extracted_dirs[@]}"; do
+            package_name="$(basename "$extract_dir")"
+            syft "dir:${extract_dir}" -o "spdx-json=dist/sbom/${package_name}.spdx.json"
+          done
 
       - name: Publish release with assets
         uses: softprops/action-gh-release@v2
@@ -224,5 +251,5 @@ jobs:
           files: |
             dist/*.zip
             dist/SHA256SUMS.txt
-            dist/sbom.spdx.json
+            dist/sbom/*.spdx.json
           generate_release_notes: true
