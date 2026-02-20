@@ -1,11 +1,33 @@
 #include "core/Game.hpp"
 
 #include <algorithm>
+#include <cstdint>
 #include <random>
 #include <utility>
 #include <vector>
 
 namespace core2048 {
+
+namespace {
+
+std::uint32_t nextBounded(std::mt19937 &rng, const std::uint32_t upperExclusive) {
+    if (upperExclusive == 0U) {
+        return 0U;
+    }
+
+    constexpr std::uint64_t range = static_cast<std::uint64_t>(std::mt19937::max()) + 1ULL;
+    const std::uint64_t bucketSize = range / upperExclusive;
+    const std::uint64_t rejectionLimit = bucketSize * upperExclusive;
+
+    std::uint64_t value = 0;
+    do {
+        value = static_cast<std::uint64_t>(rng());
+    } while (value >= rejectionLimit);
+
+    return static_cast<std::uint32_t>(value / bucketSize);
+}
+
+} // namespace
 
 Game::Game() : Game(static_cast<std::uint32_t>(std::random_device{}())) {
 }
@@ -113,11 +135,11 @@ std::optional<SpawnedTile> Game::spawnTile() {
         return std::nullopt;
     }
 
-    std::uniform_int_distribution<size_t> cellDist(0, emptyCells.size() - 1);
-    const auto [row, col] = emptyCells[cellDist(rng_)];
+    const size_t cellIndex =
+        static_cast<size_t>(nextBounded(rng_, static_cast<std::uint32_t>(emptyCells.size())));
+    const auto [row, col] = emptyCells[cellIndex];
 
-    std::uniform_int_distribution<int> valueDist(1, 10);
-    const int tileValue = (valueDist(rng_) == 10) ? 4 : 2;
+    const int tileValue = (nextBounded(rng_, 10U) == 0U) ? 4 : 2;
 
     grid_[row][col] = tileValue;
     return SpawnedTile{row, col, tileValue};

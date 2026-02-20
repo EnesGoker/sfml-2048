@@ -208,9 +208,9 @@ TEST_CASE("seed=1234 with 10 moves matches expected snapshot", "[golden]") {
     REQUIRE(movedA == movedB);
 
     const Game::Grid expectedGrid = {
-        std::array<int, 4>{4, 2, 8, 0},
-        std::array<int, 4>{8, 0, 2, 0},
-        std::array<int, 4>{4, 0, 0, 0},
+        std::array<int, 4>{2, 16, 0, 0},
+        std::array<int, 4>{2, 0, 0, 0},
+        std::array<int, 4>{4, 0, 2, 0},
         std::array<int, 4>{0, 0, 0, 0},
     };
 
@@ -219,7 +219,7 @@ TEST_CASE("seed=1234 with 10 moves matches expected snapshot", "[golden]") {
     };
 
     REQUIRE(gridA == expectedGrid);
-    REQUIRE(scoreA == 32);
+    REQUIRE(scoreA == 48);
     REQUIRE(movedA == expectedMovedFlags);
 }
 
