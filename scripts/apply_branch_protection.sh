@@ -34,6 +34,7 @@ gh api \
     "strict": true,
     "contexts": [
       "Format Check",
+      "Static Analysis (ubuntu-latest)",
       "Build and Test (ubuntu-latest)",
       "Build and Test (macos-latest)",
       "Build and Test (windows-latest)",

@@ -4,6 +4,7 @@
 
 #include <array>
 #include <cstdint>
+#include <random>
 
 namespace {
 
@@ -14,6 +15,57 @@ constexpr std::array<Direction, 10> kGoldenMoveSequence = {
     Direction::Up,   Direction::Left, Direction::Down,  Direction::Right, Direction::Up,
     Direction::Left, Direction::Down, Direction::Right, Direction::Up,    Direction::Left,
 };
+
+constexpr std::array<Direction, 4> kAllDirections = {
+    Direction::Up,
+    Direction::Down,
+    Direction::Left,
+    Direction::Right,
+};
+
+bool isPowerOfTwoOrZero(int value) {
+    if (value == 0) {
+        return true;
+    }
+
+    return value > 0 && (value & (value - 1)) == 0;
+}
+
+int sumGrid(const Game::Grid &grid) {
+    int total = 0;
+    for (const auto &row : grid) {
+        for (int value : row) {
+            total += value;
+        }
+    }
+    return total;
+}
+
+Game::Grid mirrorHorizontal(const Game::Grid &grid) {
+    Game::Grid mirrored{};
+
+    for (int r = 0; r < Game::kGridSize; ++r) {
+        for (int c = 0; c < Game::kGridSize; ++c) {
+            mirrored[r][c] = grid[r][Game::kGridSize - 1 - c];
+        }
+    }
+
+    return mirrored;
+}
+
+Game::Grid randomValidGrid(std::mt19937 &rng) {
+    std::uniform_int_distribution<int> expDist(0, 11);
+    Game::Grid grid{};
+
+    for (int r = 0; r < Game::kGridSize; ++r) {
+        for (int c = 0; c < Game::kGridSize; ++c) {
+            const int exp = expDist(rng);
+            grid[r][c] = (exp == 0) ? 0 : (1 << (exp - 1));
+        }
+    }
+
+    return grid;
+}
 
 } // namespace
 
@@ -169,4 +221,55 @@ TEST_CASE("seed=1234 with 10 moves matches expected snapshot", "[golden]") {
     REQUIRE(gridA == expectedGrid);
     REQUIRE(scoreA == 32);
     REQUIRE(movedA == expectedMovedFlags);
+}
+
+TEST_CASE("random valid boards preserve invariants after move without spawn", "[property]") {
+    std::mt19937 rng(20260220);
+
+    for (int iter = 0; iter < 300; ++iter) {
+        Game game(0);
+        game.loadState(randomValidGrid(rng), 0);
+
+        for (const Direction direction : kAllDirections) {
+            const auto before = game.getGrid();
+            const int beforeSum = sumGrid(before);
+
+            const auto result = game.applyMove(direction, false);
+            const auto &after = game.getGrid();
+
+            REQUIRE(sumGrid(after) == beforeSum);
+            REQUIRE(result.scoreDelta >= 0);
+
+            if (!result.moved) {
+                REQUIRE(after == before);
+            }
+
+            for (const auto &row : after) {
+                for (const int value : row) {
+                    REQUIRE(isPowerOfTwoOrZero(value));
+                }
+            }
+        }
+    }
+}
+
+TEST_CASE("left and right moves are mirror symmetric without spawn", "[property]") {
+    std::mt19937 rng(424242);
+
+    for (int iter = 0; iter < 200; ++iter) {
+        const Game::Grid grid = randomValidGrid(rng);
+        const Game::Grid mirroredGrid = mirrorHorizontal(grid);
+
+        Game leftGame(0);
+        leftGame.loadState(grid, 0);
+        const auto leftResult = leftGame.applyMove(Direction::Left, false);
+
+        Game rightGame(0);
+        rightGame.loadState(mirroredGrid, 0);
+        const auto rightResult = rightGame.applyMove(Direction::Right, false);
+
+        REQUIRE(leftResult.moved == rightResult.moved);
+        REQUIRE(leftResult.scoreDelta == rightResult.scoreDelta);
+        REQUIRE(leftGame.getGrid() == mirrorHorizontal(rightGame.getGrid()));
+    }
 }

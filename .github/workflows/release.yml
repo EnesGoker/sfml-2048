@@ -155,8 +155,25 @@ jobs:
           pattern: package-*
           merge-multiple: true
 
+      - name: Generate SHA256 checksums
+        run: |
+          cd dist
+          sha256sum *.zip > SHA256SUMS.txt
+
+      - name: Install syft
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b "$RUNNER_TEMP/bin"
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+
+      - name: Generate SBOM (SPDX JSON)
+        run: |
+          syft dir:dist -o spdx-json=dist/sbom.spdx.json
+
       - name: Publish release with assets
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/*.zip
+          files: |
+            dist/*.zip
+            dist/SHA256SUMS.txt
+            dist/sbom.spdx.json
           generate_release_notes: true
