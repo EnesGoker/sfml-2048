@@ -52,6 +52,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - Linux CI/release jobs now install SFML system prerequisites required by vcpkg builds.
 - Windows CI/release now run multi-config aware build/test/package commands (`--config` / `ctest -C`).
 - Core tile spawn RNG now uses an implementation-independent bounded sampler for cross-platform deterministic seed behavior.
+- CI coverage filter paths now use workspace-relative regexes to avoid platform/path encoding mismatches.
+- CI static-analysis now reports clang-tidy warnings without hard-failing on warning-level findings.
 
 ### Removed
 - Committed build artifacts (`*.o`, local binaries, `.DS_Store`).

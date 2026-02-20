@@ -120,8 +120,7 @@ jobs:
       - name: Setup vcpkg (Linux/macOS)
         if: runner.os != 'Windows'
         run: |
-          git clone --filter=blob:none https://github.com/microsoft/vcpkg.git "$RUNNER_TEMP/vcpkg"
-          git -C "$RUNNER_TEMP/vcpkg" fetch --depth 1 origin "$VCPKG_BASELINE"
+          git clone https://github.com/microsoft/vcpkg.git "$RUNNER_TEMP/vcpkg"
           git -C "$RUNNER_TEMP/vcpkg" checkout "$VCPKG_BASELINE"
           "$RUNNER_TEMP/vcpkg/bootstrap-vcpkg.sh" -disableMetrics
           echo "VCPKG_ROOT=$RUNNER_TEMP/vcpkg" >> "$GITHUB_ENV"
@@ -130,8 +129,7 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          git clone --filter=blob:none https://github.com/microsoft/vcpkg.git "$env:RUNNER_TEMP/vcpkg"
-          git -C "$env:RUNNER_TEMP/vcpkg" fetch --depth 1 origin "$env:VCPKG_BASELINE"
+          git clone https://github.com/microsoft/vcpkg.git "$env:RUNNER_TEMP/vcpkg"
           git -C "$env:RUNNER_TEMP/vcpkg" checkout "$env:VCPKG_BASELINE"
           & "$env:RUNNER_TEMP/vcpkg/bootstrap-vcpkg.bat" -disableMetrics
           "VCPKG_ROOT=$env:RUNNER_TEMP/vcpkg" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
