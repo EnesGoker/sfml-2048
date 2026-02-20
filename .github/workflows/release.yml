@@ -1,0 +1,141 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: write
+
+jobs:
+  verify-version:
+    name: Verify Tag Version
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Ensure tag matches VERSION file
+        run: |
+          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          FILE_VERSION="$(tr -d '\r\n' < VERSION)"
+
+          if [ "$TAG_VERSION" != "$FILE_VERSION" ]; then
+            echo "Tag version ($TAG_VERSION) does not match VERSION file ($FILE_VERSION)."
+            exit 1
+          fi
+
+  package:
+    name: Build and Package (${{ matrix.os }})
+    needs: verify-version
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Linux build tools
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pkg-config ccache
+
+      - name: Install macOS build tools
+        if: runner.os == 'macOS'
+        run: brew install ccache
+
+      - name: Restore ccache (Linux/macOS)
+        if: runner.os != 'Windows'
+        uses: actions/cache@v4
+        with:
+          path: ~/.ccache
+          key: ccache-release-${{ runner.os }}-${{ hashFiles('CMakeLists.txt', 'CMakePresets.json', 'src/**/*.cpp', 'src/**/*.hpp', 'tests/**/*.cpp', 'tests/**/*.hpp') }}
+          restore-keys: |
+            ccache-release-${{ runner.os }}-
+
+      - name: Restore vcpkg archives (Linux/macOS)
+        if: runner.os != 'Windows'
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/vcpkg/archives
+          key: vcpkg-release-archives-${{ runner.os }}-${{ hashFiles('vcpkg.json') }}
+          restore-keys: |
+            vcpkg-release-archives-${{ runner.os }}-
+
+      - name: Restore vcpkg archives (Windows)
+        if: runner.os == 'Windows'
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.LOCALAPPDATA }}/vcpkg/archives
+          key: vcpkg-release-archives-${{ runner.os }}-${{ hashFiles('vcpkg.json') }}
+          restore-keys: |
+            vcpkg-release-archives-${{ runner.os }}-
+
+      - name: Setup vcpkg (Linux/macOS)
+        if: runner.os != 'Windows'
+        run: |
+          git clone https://github.com/microsoft/vcpkg.git "$RUNNER_TEMP/vcpkg"
+          "$RUNNER_TEMP/vcpkg/bootstrap-vcpkg.sh" -disableMetrics
+          echo "VCPKG_ROOT=$RUNNER_TEMP/vcpkg" >> "$GITHUB_ENV"
+
+      - name: Setup vcpkg (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          git clone https://github.com/microsoft/vcpkg.git "$env:RUNNER_TEMP/vcpkg"
+          & "$env:RUNNER_TEMP/vcpkg/bootstrap-vcpkg.bat" -disableMetrics
+          "VCPKG_ROOT=$env:RUNNER_TEMP/vcpkg" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Configure (Release, Linux/macOS)
+        if: runner.os != 'Windows'
+        run: cmake --preset vcpkg-release -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+
+      - name: Configure (Release, Windows)
+        if: runner.os == 'Windows'
+        run: cmake --preset vcpkg-release
+
+      - name: Build (Release)
+        run: cmake --build --preset build-vcpkg-release
+
+      - name: Test (Release)
+        run: ctest --test-dir build/vcpkg-release --output-on-failure
+
+      - name: Package (CPack ZIP)
+        working-directory: build/vcpkg-release
+        run: cpack --config CPackConfig.cmake
+
+      - name: ccache statistics
+        if: runner.os != 'Windows'
+        run: ccache --show-stats
+
+      - name: Upload package artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: package-${{ matrix.os }}
+          path: build/vcpkg-release/*.zip
+          if-no-files-found: error
+
+  publish-release:
+    name: Publish GitHub Release
+    needs: package
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download package artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          pattern: package-*
+          merge-multiple: true
+
+      - name: Publish release with assets
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*.zip
+          generate_release_notes: true

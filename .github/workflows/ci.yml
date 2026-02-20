@@ -1,0 +1,165 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  format:
+    name: Format Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install clang-format
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang-format
+
+      - name: Run format check
+        run: ./scripts/check_format.sh
+
+  build-and-test:
+    name: Build and Test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Linux build tools
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pkg-config ccache
+
+      - name: Install macOS build tools
+        if: runner.os == 'macOS'
+        run: brew install ccache
+
+      - name: Restore ccache (Linux/macOS)
+        if: runner.os != 'Windows'
+        uses: actions/cache@v4
+        with:
+          path: ~/.ccache
+          key: ccache-${{ runner.os }}-${{ hashFiles('CMakeLists.txt', 'CMakePresets.json', 'src/**/*.cpp', 'src/**/*.hpp', 'tests/**/*.cpp', 'tests/**/*.hpp') }}
+          restore-keys: |
+            ccache-${{ runner.os }}-
+
+      - name: Restore vcpkg archives (Linux/macOS)
+        if: runner.os != 'Windows'
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/vcpkg/archives
+          key: vcpkg-archives-${{ runner.os }}-${{ hashFiles('vcpkg.json') }}
+          restore-keys: |
+            vcpkg-archives-${{ runner.os }}-
+
+      - name: Restore vcpkg archives (Windows)
+        if: runner.os == 'Windows'
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.LOCALAPPDATA }}/vcpkg/archives
+          key: vcpkg-archives-${{ runner.os }}-${{ hashFiles('vcpkg.json') }}
+          restore-keys: |
+            vcpkg-archives-${{ runner.os }}-
+
+      - name: Setup vcpkg (Linux/macOS)
+        if: runner.os != 'Windows'
+        run: |
+          git clone https://github.com/microsoft/vcpkg.git "$RUNNER_TEMP/vcpkg"
+          "$RUNNER_TEMP/vcpkg/bootstrap-vcpkg.sh" -disableMetrics
+          echo "VCPKG_ROOT=$RUNNER_TEMP/vcpkg" >> "$GITHUB_ENV"
+
+      - name: Setup vcpkg (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          git clone https://github.com/microsoft/vcpkg.git "$env:RUNNER_TEMP/vcpkg"
+          & "$env:RUNNER_TEMP/vcpkg/bootstrap-vcpkg.bat" -disableMetrics
+          "VCPKG_ROOT=$env:RUNNER_TEMP/vcpkg" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Configure (Linux/macOS)
+        if: runner.os != 'Windows'
+        run: cmake --preset vcpkg-debug -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+
+      - name: Configure (Windows)
+        if: runner.os == 'Windows'
+        run: cmake --preset vcpkg-debug
+
+      - name: Build
+        run: cmake --build --preset build-vcpkg-debug
+
+      - name: Test
+        run: ctest --test-dir build/vcpkg-debug --output-on-failure
+
+      - name: Windows runtime smoke (--help)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          & ".\\build\\vcpkg-debug\\sfml_2048.exe" --help
+
+      - name: ccache statistics
+        if: runner.os != 'Windows'
+        run: ccache --show-stats
+
+  sanitizers:
+    name: Sanitizers (ubuntu-latest)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Linux build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pkg-config ccache
+
+      - name: Restore ccache
+        uses: actions/cache@v4
+        with:
+          path: ~/.ccache
+          key: ccache-sanitizers-${{ hashFiles('CMakeLists.txt', 'CMakePresets.json', 'src/**/*.cpp', 'src/**/*.hpp', 'tests/**/*.cpp', 'tests/**/*.hpp') }}
+          restore-keys: |
+            ccache-sanitizers-
+
+      - name: Restore vcpkg archives
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/vcpkg/archives
+          key: vcpkg-archives-sanitizers-${{ hashFiles('vcpkg.json') }}
+          restore-keys: |
+            vcpkg-archives-sanitizers-
+
+      - name: Setup vcpkg
+        run: |
+          git clone https://github.com/microsoft/vcpkg.git "$RUNNER_TEMP/vcpkg"
+          "$RUNNER_TEMP/vcpkg/bootstrap-vcpkg.sh" -disableMetrics
+          echo "VCPKG_ROOT=$RUNNER_TEMP/vcpkg" >> "$GITHUB_ENV"
+
+      - name: Configure (sanitizers)
+        run: |
+          cmake \
+            -S . \
+            -B build/sanitizers \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DCMAKE_TOOLCHAIN_FILE="$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake" \
+            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
+            -DSFML_2048_ENABLE_SANITIZERS=ON
+
+      - name: Build (sanitizers)
+        run: cmake --build build/sanitizers
+
+      - name: Test (sanitizers)
+        run: ctest --test-dir build/sanitizers --output-on-failure
+
+      - name: ccache statistics
+        run: ccache --show-stats
