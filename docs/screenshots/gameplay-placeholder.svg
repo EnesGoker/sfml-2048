@@ -1,7 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="960" height="540" viewBox="0 0 960 540" role="img" aria-label="2048 project placeholder screenshot">
-  <rect width="960" height="540" fill="#faf8ef"/>
-  <rect x="200" y="80" width="560" height="380" rx="20" fill="#bbada0"/>
-  <text x="480" y="170" text-anchor="middle" font-family="Arial, sans-serif" font-size="56" fill="#776e65">2048</text>
-  <text x="480" y="250" text-anchor="middle" font-family="Arial, sans-serif" font-size="26" fill="#776e65">Gameplay screenshot placeholder</text>
-  <text x="480" y="300" text-anchor="middle" font-family="Arial, sans-serif" font-size="20" fill="#8f7a66">Replace with a real in-game capture in docs/screenshots/</text>
-</svg>

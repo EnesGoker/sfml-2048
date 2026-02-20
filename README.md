@@ -8,9 +8,7 @@ A desktop implementation of 2048 written in C++. The goal of this repository is 
 
 ## Screenshot
 
-![Gameplay preview](docs/screenshots/gameplay-placeholder.svg)
-
-> Replace `docs/screenshots/gameplay-placeholder.svg` with a real screenshot or GIF for portfolio presentation.
+![Gameplay preview](docs/screenshots/gameplay.png)
 
 ## Current Features
 
