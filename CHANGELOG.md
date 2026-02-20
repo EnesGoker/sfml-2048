@@ -61,6 +61,7 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - Release workflow now generates SPDX SBOM files from extracted package contents per platform artifact.
 - README now includes CI/release/license badges and clearer screenshot/branch-protection guidance.
 - README screenshot now points to a concrete gameplay image (`docs/screenshots/gameplay.png`) instead of placeholder art.
+- Windows release packaging now uses explicit PowerShell ZIP staging (exe + assets + DLLs) to avoid CPack failures on `windows-latest`.
 
 ### Removed
 - Committed build artifacts (`*.o`, local binaries, `.DS_Store`).

@@ -175,9 +175,33 @@ jobs:
 
       - name: Package (CPack ZIP, Windows)
         if: runner.os == 'Windows'
-        working-directory: build/vcpkg-release
         shell: pwsh
-        run: cpack --config CPackConfig.cmake -C Release
+        run: |
+          $exe = Get-ChildItem -Path ".\\build\\vcpkg-release" -Filter "sfml_2048.exe" -Recurse |
+            Where-Object { $_.FullName -match '\\Release\\' } |
+            Select-Object -First 1
+          if (-not $exe) { throw "sfml_2048.exe not found under build/vcpkg-release/Release" }
+
+          $pkgRoot = ".\\build\\vcpkg-release\\package-root"
+          $binDir = Join-Path $pkgRoot "bin"
+          $assetsDir = Join-Path $pkgRoot "assets"
+
+          New-Item -ItemType Directory -Force -Path $binDir | Out-Null
+          New-Item -ItemType Directory -Force -Path $assetsDir | Out-Null
+
+          Copy-Item -Path $exe.FullName -Destination $binDir -Force
+          Copy-Item -Path ".\\assets\\*" -Destination $assetsDir -Recurse -Force
+
+          $vcpkgBin = Join-Path $env:RUNNER_TEMP "vcpkg\\installed\\x64-windows\\bin"
+          if (Test-Path $vcpkgBin) {
+            Get-ChildItem -Path $vcpkgBin -Filter "*.dll" | ForEach-Object {
+              Copy-Item -Path $_.FullName -Destination $binDir -Force
+            }
+          }
+
+          $zipPath = ".\\build\\vcpkg-release\\sfml_2048-${{ matrix.os }}.zip"
+          if (Test-Path $zipPath) { Remove-Item $zipPath -Force }
+          Compress-Archive -Path "$pkgRoot\\*" -DestinationPath $zipPath -Force
 
       - name: ccache statistics
         if: runner.os != 'Windows'
