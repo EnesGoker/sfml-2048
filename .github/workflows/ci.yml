@@ -448,8 +448,7 @@ jobs:
         run: |
           gcovr \
             --root . \
-            --filter '^src/core/' \
-            --exclude-directories '^build/' \
+            --filter 'src/core' \
             --print-summary \
             --xml-pretty --xml build/coverage/coverage.xml \
             --html-details build/coverage/coverage.html \
