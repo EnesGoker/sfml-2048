@@ -95,6 +95,13 @@ GitHub Actions workflow: `.github/workflows/ci.yml`
 - `format`: `clang-format` policy check
 - `build-and-test`: matrix build + test on Ubuntu, macOS, Windows
 - `sanitizers`: ASan/UBSan build + test on Ubuntu
+- `coverage`: gcovr report for core module with line coverage threshold (`>= 80%`)
+
+One-time branch protection setup (maintainer):
+
+```bash
+./scripts/apply_branch_protection.sh <owner/repo>
+```
 
 ## Engineering Docs
 

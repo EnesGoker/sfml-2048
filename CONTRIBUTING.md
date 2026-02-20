@@ -49,3 +49,17 @@ ctest --test-dir build/vcpkg-debug --output-on-failure
 - New gameplay rules require unit tests.
 - Avoid platform-specific hardcoded paths.
 - Prefer deterministic behavior for reproducible bug reports.
+
+## Branch Protection (Maintainers)
+
+Apply branch protection rules for `main` (required checks + review gate):
+
+```bash
+./scripts/apply_branch_protection.sh <owner/repo>
+```
+
+If `origin` points to GitHub, the repo argument can be omitted:
+
+```bash
+./scripts/apply_branch_protection.sh
+```

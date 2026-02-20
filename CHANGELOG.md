@@ -28,6 +28,7 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - Contribution and governance docs: `CONTRIBUTING.md` and `SECURITY.md`.
 - Source-only archive script (`scripts/package_source.sh`) using metadata-clean ZIP output.
 - CI/release caching improvements for vcpkg archives and compiler cache (`ccache` on Linux/macOS).
+- Branch protection bootstrap script (`scripts/apply_branch_protection.sh`) for required checks and review gate.
 
 ### Changed
 - Standardized runtime font asset path to `assets/fonts/Geneva.ttf`.
@@ -40,6 +41,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - Text centering now uses `bounds.left/top`-aware origins to prevent per-font alignment drift.
 - Spawn animations are explicitly cleared on reset/menu transitions and when entering game-over state.
 - Removed `std::char_traits<unsigned int>` workaround header from app build path.
+- CI and release workflows now pin `vcpkg` checkout to `vcpkg.json` `builtin-baseline`.
+- Added CI coverage gate (`gcovr`) with minimum line coverage threshold for `src/core`.
 
 ### Removed
 - Committed build artifacts (`*.o`, local binaries, `.DS_Store`).

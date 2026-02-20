@@ -71,10 +71,30 @@ jobs:
           restore-keys: |
             vcpkg-archives-${{ runner.os }}-
 
+      - name: Read vcpkg baseline (Linux/macOS)
+        if: runner.os != 'Windows'
+        run: |
+          BASELINE="$(sed -n 's/.*"builtin-baseline":[[:space:]]*"\([^"]*\)".*/\1/p' vcpkg.json)"
+          if [ -z "$BASELINE" ]; then
+            echo "Failed to read builtin-baseline from vcpkg.json"
+            exit 1
+          fi
+          echo "VCPKG_BASELINE=$BASELINE" >> "$GITHUB_ENV"
+
+      - name: Read vcpkg baseline (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $match = Select-String -Path "vcpkg.json" -Pattern '"builtin-baseline"\s*:\s*"([^"]+)"'
+          if (-not $match) { throw "Failed to read builtin-baseline from vcpkg.json" }
+          $baseline = $match.Matches[0].Groups[1].Value
+          "VCPKG_BASELINE=$baseline" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
       - name: Setup vcpkg (Linux/macOS)
         if: runner.os != 'Windows'
         run: |
           git clone https://github.com/microsoft/vcpkg.git "$RUNNER_TEMP/vcpkg"
+          git -C "$RUNNER_TEMP/vcpkg" checkout "$VCPKG_BASELINE"
           "$RUNNER_TEMP/vcpkg/bootstrap-vcpkg.sh" -disableMetrics
           echo "VCPKG_ROOT=$RUNNER_TEMP/vcpkg" >> "$GITHUB_ENV"
 
@@ -83,6 +103,7 @@ jobs:
         shell: pwsh
         run: |
           git clone https://github.com/microsoft/vcpkg.git "$env:RUNNER_TEMP/vcpkg"
+          git -C "$env:RUNNER_TEMP/vcpkg" checkout "$env:VCPKG_BASELINE"
           & "$env:RUNNER_TEMP/vcpkg/bootstrap-vcpkg.bat" -disableMetrics
           "VCPKG_ROOT=$env:RUNNER_TEMP/vcpkg" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
@@ -139,9 +160,19 @@ jobs:
           restore-keys: |
             vcpkg-archives-sanitizers-
 
+      - name: Read vcpkg baseline
+        run: |
+          BASELINE="$(sed -n 's/.*"builtin-baseline":[[:space:]]*"\([^"]*\)".*/\1/p' vcpkg.json)"
+          if [ -z "$BASELINE" ]; then
+            echo "Failed to read builtin-baseline from vcpkg.json"
+            exit 1
+          fi
+          echo "VCPKG_BASELINE=$BASELINE" >> "$GITHUB_ENV"
+
       - name: Setup vcpkg
         run: |
           git clone https://github.com/microsoft/vcpkg.git "$RUNNER_TEMP/vcpkg"
+          git -C "$RUNNER_TEMP/vcpkg" checkout "$VCPKG_BASELINE"
           "$RUNNER_TEMP/vcpkg/bootstrap-vcpkg.sh" -disableMetrics
           echo "VCPKG_ROOT=$RUNNER_TEMP/vcpkg" >> "$GITHUB_ENV"
 
@@ -160,6 +191,90 @@ jobs:
 
       - name: Test (sanitizers)
         run: ctest --test-dir build/sanitizers --output-on-failure
+
+      - name: ccache statistics
+        run: ccache --show-stats
+
+  coverage:
+    name: Coverage (ubuntu-latest)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Linux build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pkg-config ccache gcovr
+
+      - name: Restore ccache
+        uses: actions/cache@v4
+        with:
+          path: ~/.ccache
+          key: ccache-coverage-${{ hashFiles('CMakeLists.txt', 'CMakePresets.json', 'src/**/*.cpp', 'src/**/*.hpp', 'tests/**/*.cpp', 'tests/**/*.hpp') }}
+          restore-keys: |
+            ccache-coverage-
+
+      - name: Restore vcpkg archives
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/vcpkg/archives
+          key: vcpkg-archives-coverage-${{ hashFiles('vcpkg.json') }}
+          restore-keys: |
+            vcpkg-archives-coverage-
+
+      - name: Read vcpkg baseline
+        run: |
+          BASELINE="$(sed -n 's/.*"builtin-baseline":[[:space:]]*"\([^"]*\)".*/\1/p' vcpkg.json)"
+          if [ -z "$BASELINE" ]; then
+            echo "Failed to read builtin-baseline from vcpkg.json"
+            exit 1
+          fi
+          echo "VCPKG_BASELINE=$BASELINE" >> "$GITHUB_ENV"
+
+      - name: Setup vcpkg
+        run: |
+          git clone https://github.com/microsoft/vcpkg.git "$RUNNER_TEMP/vcpkg"
+          git -C "$RUNNER_TEMP/vcpkg" checkout "$VCPKG_BASELINE"
+          "$RUNNER_TEMP/vcpkg/bootstrap-vcpkg.sh" -disableMetrics
+          echo "VCPKG_ROOT=$RUNNER_TEMP/vcpkg" >> "$GITHUB_ENV"
+
+      - name: Configure (coverage)
+        run: |
+          cmake \
+            -S . \
+            -B build/coverage \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DCMAKE_TOOLCHAIN_FILE="$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake" \
+            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
+            -DSFML_2048_ENABLE_COVERAGE=ON
+
+      - name: Build (coverage)
+        run: cmake --build build/coverage
+
+      - name: Test (coverage)
+        run: ctest --test-dir build/coverage --output-on-failure
+
+      - name: Generate coverage report (>=80% line)
+        run: |
+          gcovr \
+            --root "$GITHUB_WORKSPACE" \
+            --filter "$GITHUB_WORKSPACE/src/core" \
+            --exclude-directories "$GITHUB_WORKSPACE/build" \
+            --print-summary \
+            --xml-pretty --xml build/coverage/coverage.xml \
+            --html-details build/coverage/coverage.html \
+            --fail-under-line 80
+
+      - name: Upload coverage artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: |
+            build/coverage/coverage.xml
+            build/coverage/*.html
+          if-no-files-found: error
 
       - name: ccache statistics
         run: ccache --show-stats

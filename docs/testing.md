@@ -58,5 +58,6 @@ GitHub Actions (`.github/workflows/ci.yml`) runs:
 - format check (`clang-format`)
 - build + tests on Linux/macOS/Windows
 - sanitizer job on Linux
+- coverage job (`gcovr`) with `--fail-under-line 80` for `src/core`
 
 Release workflow (`.github/workflows/release.yml`) also runs tests before packaging.

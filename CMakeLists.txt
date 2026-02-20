@@ -20,6 +20,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 option(SFML_2048_ENABLE_WARNINGS "Enable strict compiler warnings" ON)
 option(SFML_2048_ENABLE_SANITIZERS "Enable AddressSanitizer + UndefinedBehaviorSanitizer" OFF)
+option(SFML_2048_ENABLE_COVERAGE "Enable coverage instrumentation (GCC/Clang)" OFF)
 
 function(enable_project_warnings target_name)
     if (NOT SFML_2048_ENABLE_WARNINGS)
@@ -52,6 +53,22 @@ function(enable_project_sanitizers target_name)
     endif()
 endfunction()
 
+function(enable_project_coverage target_name)
+    if (NOT SFML_2048_ENABLE_COVERAGE)
+        return()
+    endif()
+
+    if (MSVC)
+        message(WARNING "Coverage instrumentation is not enabled for MSVC in this project.")
+        return()
+    endif()
+
+    if (CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
+        target_compile_options(${target_name} PRIVATE -O0 -g --coverage)
+        target_link_options(${target_name} PRIVATE --coverage)
+    endif()
+endfunction()
+
 find_package(SFML 2.5 COMPONENTS graphics window system CONFIG QUIET)
 if (NOT SFML_FOUND)
     find_package(SFML 2.5 COMPONENTS graphics window system REQUIRED)
@@ -67,6 +84,7 @@ target_include_directories(game_core
 
 enable_project_warnings(game_core)
 enable_project_sanitizers(game_core)
+enable_project_coverage(game_core)
 
 add_executable(sfml_2048
     src/app/main.cpp
@@ -85,6 +103,7 @@ endif()
 
 enable_project_warnings(sfml_2048)
 enable_project_sanitizers(sfml_2048)
+enable_project_coverage(sfml_2048)
 
 # Keep runtime assets available next to build outputs.
 add_custom_command(TARGET sfml_2048 POST_BUILD
@@ -138,6 +157,7 @@ if (BUILD_TESTING)
     target_link_libraries(core_unit_tests PRIVATE game_core Catch2::Catch2WithMain)
     enable_project_warnings(core_unit_tests)
     enable_project_sanitizers(core_unit_tests)
+    enable_project_coverage(core_unit_tests)
 
     add_test(
         NAME core_unit_tests
