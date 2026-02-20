@@ -3,29 +3,12 @@
     {
       "name": "macOS",
       "compilerPath": "/usr/bin/clang++",
-      "cStandard": "c11",
-      "cppStandard": "c++17",
-      "intelliSenseMode": "macos-clang-x64",
-
-      "includePath": [
-        "${workspaceFolder}/**",
-        "/opt/homebrew/include",     
-        "/opt/homebrew/include/SFML"   
-      ],
-
-      "macFrameworkPath": [
-        "/System/Library/Frameworks",
-        "/Library/Frameworks"
-      ],
-
-      "browse": {
-        "path": [
-          "${workspaceFolder}",
-          "/opt/homebrew/include",
-          "/opt/homebrew/include/SFML"
-        ],
-        "limitSymbolsToIncludedHeaders": true
-      }
+      "cStandard": "c17",
+      "cppStandard": "c++20",
+      "intelliSenseMode": "macos-clang-arm64",
+      "compileCommands": "${workspaceFolder}/build/vcpkg-debug/compile_commands.json",
+      "configurationProvider": "ms-vscode.cmake-tools",
+      "includePath": ["${workspaceFolder}/src", "${workspaceFolder}/tests"]
     }
   ],
   "version": 4

@@ -1,29 +1,30 @@
 {
+    "version": "2.0.0",
     "tasks": [
         {
-            "type": "cppbuild",
-            "label": "C/C++: clang etkin dosyayı derle",
-            "command": "/usr/bin/clang",
-            "args": [
-                "-fcolor-diagnostics",
-                "-fansi-escape-codes",
-                "-g",
-                "${file}",
-                "-o",
-                "${fileDirname}/${fileBasenameNoExtension}"
-            ],
-            "options": {
-                "cwd": "${fileDirname}"
-            },
-            "problemMatcher": [
-                "$gcc"
-            ],
+            "label": "CMake: Configure (vcpkg-debug)",
+            "type": "shell",
+            "command": "cmake --preset vcpkg-debug",
+            "problemMatcher": []
+        },
+        {
+            "label": "CMake: Build (vcpkg-debug)",
+            "type": "shell",
+            "command": "cmake --build --preset build-vcpkg-debug",
+            "dependsOn": "CMake: Configure (vcpkg-debug)",
+            "problemMatcher": ["$gcc"],
             "group": {
                 "kind": "build",
                 "isDefault": true
-            },
-            "detail": "Hata Ayıklayıcısı tarafından oluşturulan görev."
+            }
+        },
+        {
+            "label": "CMake: Test (vcpkg-debug)",
+            "type": "shell",
+            "command": "ctest --test-dir build/vcpkg-debug --output-on-failure",
+            "dependsOn": "CMake: Build (vcpkg-debug)",
+            "problemMatcher": ["$gcc"],
+            "group": "test"
         }
-    ],
-    "version": "2.0.0"
+    ]
 }
