@@ -30,10 +30,33 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Setup CMake
+        uses: lukka/get-cmake@latest
+        with:
+          cmakeVersion: 3.29.6
+
+      - name: CMake version
+        run: cmake --version
+
       - name: Install Linux build tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y pkg-config ccache clang-tidy
+          sudo apt-get install -y \
+            pkg-config \
+            ccache \
+            clang-tidy \
+            libx11-dev \
+            libxrandr-dev \
+            libxcursor-dev \
+            libxi-dev \
+            libxinerama-dev \
+            libudev-dev \
+            libgl1-mesa-dev \
+            libegl1-mesa-dev \
+            libflac-dev \
+            libvorbis-dev \
+            libopenal-dev \
+            libfreetype6-dev
 
       - name: Restore ccache
         uses: actions/cache@v4
@@ -62,7 +85,8 @@ jobs:
 
       - name: Setup vcpkg
         run: |
-          git clone https://github.com/microsoft/vcpkg.git "$RUNNER_TEMP/vcpkg"
+          git clone --filter=blob:none https://github.com/microsoft/vcpkg.git "$RUNNER_TEMP/vcpkg"
+          git -C "$RUNNER_TEMP/vcpkg" fetch --depth 1 origin "$VCPKG_BASELINE"
           git -C "$RUNNER_TEMP/vcpkg" checkout "$VCPKG_BASELINE"
           "$RUNNER_TEMP/vcpkg/bootstrap-vcpkg.sh" -disableMetrics
           echo "VCPKG_ROOT=$RUNNER_TEMP/vcpkg" >> "$GITHUB_ENV"
@@ -111,11 +135,33 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Setup CMake
+        uses: lukka/get-cmake@latest
+        with:
+          cmakeVersion: 3.29.6
+
+      - name: CMake version
+        run: cmake --version
+
       - name: Install Linux build tools
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y pkg-config ccache
+          sudo apt-get install -y \
+            pkg-config \
+            ccache \
+            libx11-dev \
+            libxrandr-dev \
+            libxcursor-dev \
+            libxi-dev \
+            libxinerama-dev \
+            libudev-dev \
+            libgl1-mesa-dev \
+            libegl1-mesa-dev \
+            libflac-dev \
+            libvorbis-dev \
+            libopenal-dev \
+            libfreetype6-dev
 
       - name: Install macOS build tools
         if: runner.os == 'macOS'
@@ -170,7 +216,8 @@ jobs:
       - name: Setup vcpkg (Linux/macOS)
         if: runner.os != 'Windows'
         run: |
-          git clone https://github.com/microsoft/vcpkg.git "$RUNNER_TEMP/vcpkg"
+          git clone --filter=blob:none https://github.com/microsoft/vcpkg.git "$RUNNER_TEMP/vcpkg"
+          git -C "$RUNNER_TEMP/vcpkg" fetch --depth 1 origin "$VCPKG_BASELINE"
           git -C "$RUNNER_TEMP/vcpkg" checkout "$VCPKG_BASELINE"
           "$RUNNER_TEMP/vcpkg/bootstrap-vcpkg.sh" -disableMetrics
           echo "VCPKG_ROOT=$RUNNER_TEMP/vcpkg" >> "$GITHUB_ENV"
@@ -179,7 +226,8 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          git clone https://github.com/microsoft/vcpkg.git "$env:RUNNER_TEMP/vcpkg"
+          git clone --filter=blob:none https://github.com/microsoft/vcpkg.git "$env:RUNNER_TEMP/vcpkg"
+          git -C "$env:RUNNER_TEMP/vcpkg" fetch --depth 1 origin "$env:VCPKG_BASELINE"
           git -C "$env:RUNNER_TEMP/vcpkg" checkout "$env:VCPKG_BASELINE"
           & "$env:RUNNER_TEMP/vcpkg/bootstrap-vcpkg.bat" -disableMetrics
           "VCPKG_ROOT=$env:RUNNER_TEMP/vcpkg" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
@@ -192,17 +240,30 @@ jobs:
         if: runner.os == 'Windows'
         run: cmake --preset vcpkg-debug
 
-      - name: Build
+      - name: Build (Linux/macOS)
+        if: runner.os != 'Windows'
         run: cmake --build --preset build-vcpkg-debug
 
-      - name: Test
+      - name: Build (Windows)
+        if: runner.os == 'Windows'
+        run: cmake --build --preset build-vcpkg-debug --config Debug
+
+      - name: Test (Linux/macOS)
+        if: runner.os != 'Windows'
         run: ctest --test-dir build/vcpkg-debug --output-on-failure
+
+      - name: Test (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: ctest --test-dir build/vcpkg-debug --output-on-failure -C Debug
 
       - name: Windows runtime smoke (--help)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          & ".\\build\\vcpkg-debug\\sfml_2048.exe" --help
+          $exe = Get-ChildItem -Path ".\\build\\vcpkg-debug" -Filter "sfml_2048.exe" -Recurse | Select-Object -First 1
+          if (-not $exe) { throw "sfml_2048.exe not found under build/vcpkg-debug" }
+          & $exe.FullName --help
 
       - name: ccache statistics
         if: runner.os != 'Windows'
@@ -216,10 +277,32 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Setup CMake
+        uses: lukka/get-cmake@latest
+        with:
+          cmakeVersion: 3.29.6
+
+      - name: CMake version
+        run: cmake --version
+
       - name: Install Linux build tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y pkg-config ccache
+          sudo apt-get install -y \
+            pkg-config \
+            ccache \
+            libx11-dev \
+            libxrandr-dev \
+            libxcursor-dev \
+            libxi-dev \
+            libxinerama-dev \
+            libudev-dev \
+            libgl1-mesa-dev \
+            libegl1-mesa-dev \
+            libflac-dev \
+            libvorbis-dev \
+            libopenal-dev \
+            libfreetype6-dev
 
       - name: Restore ccache
         uses: actions/cache@v4
@@ -248,7 +331,8 @@ jobs:
 
       - name: Setup vcpkg
         run: |
-          git clone https://github.com/microsoft/vcpkg.git "$RUNNER_TEMP/vcpkg"
+          git clone --filter=blob:none https://github.com/microsoft/vcpkg.git "$RUNNER_TEMP/vcpkg"
+          git -C "$RUNNER_TEMP/vcpkg" fetch --depth 1 origin "$VCPKG_BASELINE"
           git -C "$RUNNER_TEMP/vcpkg" checkout "$VCPKG_BASELINE"
           "$RUNNER_TEMP/vcpkg/bootstrap-vcpkg.sh" -disableMetrics
           echo "VCPKG_ROOT=$RUNNER_TEMP/vcpkg" >> "$GITHUB_ENV"
@@ -280,10 +364,33 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Setup CMake
+        uses: lukka/get-cmake@latest
+        with:
+          cmakeVersion: 3.29.6
+
+      - name: CMake version
+        run: cmake --version
+
       - name: Install Linux build tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y pkg-config ccache gcovr
+          sudo apt-get install -y \
+            pkg-config \
+            ccache \
+            gcovr \
+            libx11-dev \
+            libxrandr-dev \
+            libxcursor-dev \
+            libxi-dev \
+            libxinerama-dev \
+            libudev-dev \
+            libgl1-mesa-dev \
+            libegl1-mesa-dev \
+            libflac-dev \
+            libvorbis-dev \
+            libopenal-dev \
+            libfreetype6-dev
 
       - name: Restore ccache
         uses: actions/cache@v4
@@ -312,7 +419,8 @@ jobs:
 
       - name: Setup vcpkg
         run: |
-          git clone https://github.com/microsoft/vcpkg.git "$RUNNER_TEMP/vcpkg"
+          git clone --filter=blob:none https://github.com/microsoft/vcpkg.git "$RUNNER_TEMP/vcpkg"
+          git -C "$RUNNER_TEMP/vcpkg" fetch --depth 1 origin "$VCPKG_BASELINE"
           git -C "$RUNNER_TEMP/vcpkg" checkout "$VCPKG_BASELINE"
           "$RUNNER_TEMP/vcpkg/bootstrap-vcpkg.sh" -disableMetrics
           echo "VCPKG_ROOT=$RUNNER_TEMP/vcpkg" >> "$GITHUB_ENV"

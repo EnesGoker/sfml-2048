@@ -63,19 +63,23 @@
   "buildPresets": [
     {
       "name": "build-debug",
-      "configurePreset": "debug"
+      "configurePreset": "debug",
+      "configuration": "Debug"
     },
     {
       "name": "build-release",
-      "configurePreset": "release"
+      "configurePreset": "release",
+      "configuration": "Release"
     },
     {
       "name": "build-vcpkg-debug",
-      "configurePreset": "vcpkg-debug"
+      "configurePreset": "vcpkg-debug",
+      "configuration": "Debug"
     },
     {
       "name": "build-vcpkg-release",
-      "configurePreset": "vcpkg-release"
+      "configurePreset": "vcpkg-release",
+      "configuration": "Release"
     }
   ]
 }

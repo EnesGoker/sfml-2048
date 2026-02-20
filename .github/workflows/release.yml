@@ -39,11 +39,33 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Setup CMake
+        uses: lukka/get-cmake@latest
+        with:
+          cmakeVersion: 3.29.6
+
+      - name: CMake version
+        run: cmake --version
+
       - name: Install Linux build tools
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y pkg-config ccache
+          sudo apt-get install -y \
+            pkg-config \
+            ccache \
+            libx11-dev \
+            libxrandr-dev \
+            libxcursor-dev \
+            libxi-dev \
+            libxinerama-dev \
+            libudev-dev \
+            libgl1-mesa-dev \
+            libegl1-mesa-dev \
+            libflac-dev \
+            libvorbis-dev \
+            libopenal-dev \
+            libfreetype6-dev
 
       - name: Install macOS build tools
         if: runner.os == 'macOS'
@@ -98,7 +120,8 @@ jobs:
       - name: Setup vcpkg (Linux/macOS)
         if: runner.os != 'Windows'
         run: |
-          git clone https://github.com/microsoft/vcpkg.git "$RUNNER_TEMP/vcpkg"
+          git clone --filter=blob:none https://github.com/microsoft/vcpkg.git "$RUNNER_TEMP/vcpkg"
+          git -C "$RUNNER_TEMP/vcpkg" fetch --depth 1 origin "$VCPKG_BASELINE"
           git -C "$RUNNER_TEMP/vcpkg" checkout "$VCPKG_BASELINE"
           "$RUNNER_TEMP/vcpkg/bootstrap-vcpkg.sh" -disableMetrics
           echo "VCPKG_ROOT=$RUNNER_TEMP/vcpkg" >> "$GITHUB_ENV"
@@ -107,7 +130,8 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          git clone https://github.com/microsoft/vcpkg.git "$env:RUNNER_TEMP/vcpkg"
+          git clone --filter=blob:none https://github.com/microsoft/vcpkg.git "$env:RUNNER_TEMP/vcpkg"
+          git -C "$env:RUNNER_TEMP/vcpkg" fetch --depth 1 origin "$env:VCPKG_BASELINE"
           git -C "$env:RUNNER_TEMP/vcpkg" checkout "$env:VCPKG_BASELINE"
           & "$env:RUNNER_TEMP/vcpkg/bootstrap-vcpkg.bat" -disableMetrics
           "VCPKG_ROOT=$env:RUNNER_TEMP/vcpkg" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
@@ -120,15 +144,33 @@ jobs:
         if: runner.os == 'Windows'
         run: cmake --preset vcpkg-release
 
-      - name: Build (Release)
+      - name: Build (Release, Linux/macOS)
+        if: runner.os != 'Windows'
         run: cmake --build --preset build-vcpkg-release
 
-      - name: Test (Release)
+      - name: Build (Release, Windows)
+        if: runner.os == 'Windows'
+        run: cmake --build --preset build-vcpkg-release --config Release
+
+      - name: Test (Release, Linux/macOS)
+        if: runner.os != 'Windows'
         run: ctest --test-dir build/vcpkg-release --output-on-failure
 
-      - name: Package (CPack ZIP)
+      - name: Test (Release, Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: ctest --test-dir build/vcpkg-release --output-on-failure -C Release
+
+      - name: Package (CPack ZIP, Linux/macOS)
+        if: runner.os != 'Windows'
         working-directory: build/vcpkg-release
         run: cpack --config CPackConfig.cmake
+
+      - name: Package (CPack ZIP, Windows)
+        if: runner.os == 'Windows'
+        working-directory: build/vcpkg-release
+        shell: pwsh
+        run: cpack --config CPackConfig.cmake -C Release
 
       - name: ccache statistics
         if: runner.os != 'Windows'

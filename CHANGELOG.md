@@ -48,6 +48,9 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - CI and release workflows now pin `vcpkg` checkout to `vcpkg.json` `builtin-baseline`.
 - Added CI coverage gate (`gcovr`) with minimum line coverage threshold for `src/core`.
 - CI now runs a dedicated clang-tidy static analysis job (`bugprone`, `performance`, `portability`).
+- CI/release now provision CMake `3.29.6` explicitly to satisfy preset minimum requirements on all runners.
+- Linux CI/release jobs now install SFML system prerequisites required by vcpkg builds.
+- Windows CI/release now run multi-config aware build/test/package commands (`--config` / `ctest -C`).
 
 ### Removed
 - Committed build artifacts (`*.o`, local binaries, `.DS_Store`).
