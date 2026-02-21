@@ -88,6 +88,7 @@ enable_project_coverage(game_core)
 
 add_executable(sfml_2048
     src/app/main.cpp
+    src/app/AssetResolver.cpp
     src/app/App.cpp
 )
 

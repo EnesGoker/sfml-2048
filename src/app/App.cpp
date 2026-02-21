@@ -1,26 +1,15 @@
 #include "app/App.hpp"
+#include "app/AssetResolver.hpp"
 #include "core/Game.hpp"
 
 #include <SFML/Graphics.hpp>
 
-#include <array>
 #include <chrono>
-#include <filesystem>
 #include <iostream>
 #include <map>
 #include <optional>
 #include <string>
-#include <system_error>
 #include <utility>
-#include <vector>
-
-#if defined(_WIN32)
-#include <windows.h>
-#elif defined(__APPLE__)
-#include <mach-o/dyld.h>
-#elif defined(__linux__)
-#include <unistd.h>
-#endif
 
 namespace {
 
@@ -28,6 +17,7 @@ constexpr int kCellSize = 100;
 constexpr int kGridSize = core2048::Game::kGridSize;
 constexpr int kPadding = 10;
 constexpr int kTopPanelHeight = 80;
+constexpr float kSpawnAnimationDuration = 0.2f;
 constexpr char kFontRelativePath[] = "assets/fonts/Geneva.ttf";
 constexpr float kButtonHorizontalPadding = 44.f;
 constexpr float kButtonVerticalPadding = 24.f;
@@ -36,97 +26,11 @@ const sf::Color kPrimaryButtonHoverColor(50, 180, 255);
 const sf::Color kDangerButtonColor(190, 70, 70);
 const sf::Color kDangerButtonHoverColor(220, 95, 95);
 
-std::filesystem::path getExecutablePath() {
-#if defined(_WIN32)
-    std::vector<wchar_t> buffer(260);
+using Clock = std::chrono::steady_clock;
+using SpawnAnimations = std::map<std::pair<int, int>, Clock::time_point>;
 
-    while (true) {
-        const DWORD copied =
-            GetModuleFileNameW(nullptr, buffer.data(), static_cast<DWORD>(buffer.size()));
-
-        if (copied == 0) {
-            return {};
-        }
-
-        if (copied < static_cast<DWORD>(buffer.size())) {
-            return std::filesystem::path(std::wstring(buffer.data(), copied));
-        }
-
-        buffer.resize(buffer.size() * 2);
-    }
-#elif defined(__APPLE__)
-    uint32_t size = 0;
-    _NSGetExecutablePath(nullptr, &size);
-    if (size == 0) {
-        return {};
-    }
-
-    std::string buffer(size, '\0');
-    if (_NSGetExecutablePath(buffer.data(), &size) != 0) {
-        return {};
-    }
-
-    std::filesystem::path executable(buffer.c_str());
-    std::error_code ec;
-    const auto resolved = std::filesystem::weakly_canonical(executable, ec);
-    return ec ? executable : resolved;
-#elif defined(__linux__)
-    std::array<char, 4096> buffer{};
-    const ssize_t count = ::readlink("/proc/self/exe", buffer.data(), buffer.size() - 1);
-    if (count <= 0) {
-        return {};
-    }
-
-    buffer[static_cast<size_t>(count)] = '\0';
-    return std::filesystem::path(buffer.data());
-#else
-    return {};
-#endif
-}
-
-std::vector<std::filesystem::path>
-buildAssetPathCandidates(const std::filesystem::path &relativeAssetPath) {
-    std::vector<std::filesystem::path> candidates;
-    const auto appendCandidate = [&](const std::filesystem::path &candidatePath) {
-        const auto normalized = candidatePath.lexically_normal();
-        for (const auto &existing : candidates) {
-            if (existing == normalized) {
-                return;
-            }
-        }
-        candidates.push_back(normalized);
-    };
-
-    const auto executablePath = getExecutablePath();
-    if (!executablePath.empty()) {
-        const auto executableDir = executablePath.parent_path();
-        appendCandidate(executableDir / relativeAssetPath);
-        appendCandidate(executableDir.parent_path() / relativeAssetPath);
-#if defined(__APPLE__)
-        appendCandidate(executableDir / ".." / ".." / "Resources" / relativeAssetPath);
-#endif
-    }
-
-    std::error_code ec;
-    const auto cwd = std::filesystem::current_path(ec);
-    if (!ec) {
-        appendCandidate(cwd / relativeAssetPath);
-    }
-
-    appendCandidate(relativeAssetPath);
-    return candidates;
-}
-
-std::optional<std::filesystem::path>
-findFirstExistingPath(const std::vector<std::filesystem::path> &candidates) {
-    for (const auto &candidate : candidates) {
-        std::error_code ec;
-        if (std::filesystem::exists(candidate, ec) && !ec) {
-            return candidate;
-        }
-    }
-    return std::nullopt;
-}
+enum class SceneId { Splash, Playing, GameOver };
+enum class SceneCommand { None, StartGame, ShowSplash, RestartGame, Quit };
 
 void centerTextOrigin(sf::Text &text) {
     const auto bounds = text.getLocalBounds();
@@ -192,234 +96,166 @@ std::optional<core2048::Direction> mapDirection(const sf::Keyboard::Key key) {
     }
 }
 
-} // namespace
-
-namespace app {
-
-int run(const RunConfig &config) {
-    using Clock = std::chrono::steady_clock;
-    std::map<std::pair<int, int>, Clock::time_point> spawnAnimations;
-    constexpr float animationDuration = 0.2f;
-
-    enum class GameState { Splash, Playing, GameOver };
-    GameState state = GameState::Splash;
-    core2048::Game game;
-
-    const auto resetGame = [&]() {
-        if (config.seed.has_value()) {
-            game.reset(*config.seed);
-        } else {
-            game.reset();
-        }
-        spawnAnimations.clear();
-    };
-
-    const int width = kGridSize * kCellSize + (kGridSize + 1) * kPadding;
-    const int height = kTopPanelHeight + kGridSize * kCellSize + (kGridSize + 1) * kPadding;
-
-    sf::RenderWindow window({(unsigned int)width, (unsigned int)height}, "2048",
-                            sf::Style::Titlebar | sf::Style::Close);
-    window.setFramerateLimit(60);
-
-    const auto fontCandidates = buildAssetPathCandidates(kFontRelativePath);
-    const auto resolvedFontPath = findFirstExistingPath(fontCandidates);
-
-    sf::Font font;
-    if (!resolvedFontPath.has_value() || !font.loadFromFile(resolvedFontPath->string())) {
-        std::cerr << "Font could not be loaded. Tried:\n";
-        for (const auto &candidate : fontCandidates) {
-            std::cerr << "  - " << candidate.string() << "\n";
-        }
-        return 1;
+class GameSession {
+  public:
+    explicit GameSession(const app::RunConfig &config) : config_(config) {
     }
 
-    sf::Text splashTitle("2048", font, 72);
-    splashTitle.setStyle(sf::Text::Bold | sf::Text::Underlined);
-    splashTitle.setFillColor(sf::Color::Black);
-    centerTextOrigin(splashTitle);
-    splashTitle.setPosition(width / 2.f, height / 3.f);
+    void resetGame() {
+        if (config_.seed.has_value()) {
+            game_.reset(*config_.seed);
+        } else {
+            game_.reset();
+        }
+        spawnAnimations_.clear();
+    }
 
-    sf::Text splashButtonText("START", font, 36);
-    splashButtonText.setFillColor(sf::Color::White);
-    centerTextOrigin(splashButtonText);
+    void clearSpawnAnimations() {
+        spawnAnimations_.clear();
+    }
 
-    sf::RectangleShape splashButton = createButtonForText(splashButtonText);
-    splashButton.setFillColor(kPrimaryButtonColor);
-    splashButton.setPosition(width / 2.f, height / 2.f);
+    const core2048::Game &game() const {
+        return game_;
+    }
 
-    splashButtonText.setPosition(splashButton.getPosition());
+    SpawnAnimations &spawnAnimations() {
+        return spawnAnimations_;
+    }
 
-    sf::Text scoreText("", font, 24);
-    scoreText.setFillColor(sf::Color::Black);
+    void applyMove(core2048::Direction direction) {
+        const auto result = game_.applyMove(direction);
+        if (!result.spawnedTile.has_value()) {
+            return;
+        }
 
-    sf::RectangleShape overFade({(float)width, (float)height});
-    overFade.setFillColor(sf::Color(0, 0, 0, 150));
+        const auto &spawned = *result.spawnedTile;
+        spawnAnimations_[{spawned.row, spawned.col}] = Clock::now();
+    }
 
-    sf::RectangleShape overBox({380.f, 250.f});
-    overBox.setFillColor(sf::Color::White);
-    overBox.setOutlineThickness(4.f);
-    overBox.setOutlineColor({200, 0, 0});
-    overBox.setOrigin(overBox.getSize() / 2.f);
+  private:
+    const app::RunConfig &config_;
+    core2048::Game game_;
+    SpawnAnimations spawnAnimations_;
+};
 
-    sf::Text overText("Game Over", font, 40);
-    overText.setFillColor(sf::Color::Red);
-    overText.setStyle(sf::Text::Bold);
-    centerTextOrigin(overText);
+class SplashScene {
+  public:
+    SplashScene(const sf::Font &font, const float width, const float height)
+        : title_("2048", font, 72), buttonText_("START", font, 36),
+          button_(createButtonForText(buttonText_)) {
+        title_.setStyle(sf::Text::Bold | sf::Text::Underlined);
+        title_.setFillColor(sf::Color::Black);
+        centerTextOrigin(title_);
+        title_.setPosition(width / 2.f, height / 3.f);
 
-    sf::Text overScoreText("", font, 26);
-    overScoreText.setFillColor(sf::Color(30, 30, 30));
-    overScoreText.setStyle(sf::Text::Bold);
+        buttonText_.setFillColor(sf::Color::White);
+        centerTextOrigin(buttonText_);
 
-    sf::Text overHintText("N/Enter: New Game   Q/Esc: Quit", font, 16);
-    overHintText.setFillColor(sf::Color(80, 80, 80));
-    centerTextOrigin(overHintText);
+        button_.setFillColor(kPrimaryButtonColor);
+        button_.setPosition(width / 2.f, height / 2.f);
+        buttonText_.setPosition(button_.getPosition());
+    }
 
-    sf::Text newGameText("NEW GAME", font, 22);
-    newGameText.setFillColor(sf::Color::White);
-    centerTextOrigin(newGameText);
-    sf::RectangleShape newGameButton = createButtonForText(newGameText);
-    newGameButton.setFillColor(kPrimaryButtonColor);
+    SceneCommand handleEvent(const sf::Event &event, const sf::RenderWindow &window) const {
+        if (event.type == sf::Event::KeyPressed &&
+            (event.key.code == sf::Keyboard::Escape || event.key.code == sf::Keyboard::Q)) {
+            return SceneCommand::Quit;
+        }
 
-    sf::Text quitText("QUIT", font, 22);
-    quitText.setFillColor(sf::Color::White);
-    centerTextOrigin(quitText);
-    sf::RectangleShape quitButton = createButtonForText(quitText);
-    quitButton.setFillColor(kDangerButtonColor);
-
-    while (window.isOpen()) {
-        sf::Event event;
-        while (window.pollEvent(event)) {
-            if (event.type == sf::Event::Closed) {
-                window.close();
-            }
-
-            if (state == GameState::Splash) {
-                if (event.type == sf::Event::KeyPressed &&
-                    (event.key.code == sf::Keyboard::Escape || event.key.code == sf::Keyboard::Q)) {
-                    window.close();
-                }
-                if (event.type == sf::Event::MouseButtonPressed &&
-                    event.mouseButton.button == sf::Mouse::Left) {
-                    const sf::Vector2f clickPos =
-                        window.mapPixelToCoords({event.mouseButton.x, event.mouseButton.y});
-                    if (splashButton.getGlobalBounds().contains(clickPos)) {
-                        resetGame();
-                        state = GameState::Playing;
-                    }
-                }
-                continue;
-            }
-
-            if (state == GameState::Playing) {
-                if (event.type == sf::Event::KeyPressed) {
-                    if (event.key.code == sf::Keyboard::Escape) {
-                        spawnAnimations.clear();
-                        state = GameState::Splash;
-                        continue;
-                    }
-
-                    const auto dir = mapDirection(event.key.code);
-                    if (dir.has_value()) {
-                        const auto result = game.applyMove(*dir);
-                        if (result.spawnedTile.has_value()) {
-                            const auto &spawned = *result.spawnedTile;
-                            spawnAnimations[{spawned.row, spawned.col}] = Clock::now();
-                        }
-                    }
-                }
-
-                if (game.isGameOver()) {
-                    spawnAnimations.clear();
-                    state = GameState::GameOver;
-                }
-                continue;
-            }
-
-            if (state == GameState::GameOver) {
-                if (event.type == sf::Event::KeyPressed) {
-                    if (event.key.code == sf::Keyboard::N ||
-                        event.key.code == sf::Keyboard::Enter) {
-                        resetGame();
-                        state = GameState::Playing;
-                    } else if (event.key.code == sf::Keyboard::Q ||
-                               event.key.code == sf::Keyboard::Escape) {
-                        window.close();
-                    }
-                }
-
-                if (event.type == sf::Event::MouseButtonPressed &&
-                    event.mouseButton.button == sf::Mouse::Left) {
-                    const sf::Vector2f clickPos =
-                        window.mapPixelToCoords({event.mouseButton.x, event.mouseButton.y});
-                    if (newGameButton.getGlobalBounds().contains(clickPos)) {
-                        resetGame();
-                        state = GameState::Playing;
-                    } else if (quitButton.getGlobalBounds().contains(clickPos)) {
-                        window.close();
-                    }
-                }
+        if (event.type == sf::Event::MouseButtonPressed &&
+            event.mouseButton.button == sf::Mouse::Left) {
+            const sf::Vector2f clickPos =
+                window.mapPixelToCoords({event.mouseButton.x, event.mouseButton.y});
+            if (button_.getGlobalBounds().contains(clickPos)) {
+                return SceneCommand::StartGame;
             }
         }
 
-        const sf::Vector2f mousePos = window.mapPixelToCoords(sf::Mouse::getPosition(window));
-        if (state == GameState::Splash) {
-            updateButtonColor(splashButton, splashButton.getGlobalBounds().contains(mousePos),
-                              kPrimaryButtonColor, kPrimaryButtonHoverColor);
-        } else if (state == GameState::GameOver) {
-            updateButtonColor(newGameButton, newGameButton.getGlobalBounds().contains(mousePos),
-                              kPrimaryButtonColor, kPrimaryButtonHoverColor);
-            updateButtonColor(quitButton, quitButton.getGlobalBounds().contains(mousePos),
-                              kDangerButtonColor, kDangerButtonHoverColor);
+        return SceneCommand::None;
+    }
+
+    void updateHover(const sf::Vector2f &mousePos) {
+        updateButtonColor(button_, button_.getGlobalBounds().contains(mousePos),
+                          kPrimaryButtonColor, kPrimaryButtonHoverColor);
+    }
+
+    void render(sf::RenderWindow &window) const {
+        window.draw(title_);
+        window.draw(button_);
+        window.draw(buttonText_);
+    }
+
+  private:
+    sf::Text title_;
+    sf::Text buttonText_;
+    sf::RectangleShape button_;
+};
+
+class PlayingScene {
+  public:
+    explicit PlayingScene(const sf::Font &font) : scoreText_("", font, 24) {
+        scoreText_.setFillColor(sf::Color::Black);
+    }
+
+    SceneCommand handleEvent(const sf::Event &event, GameSession &session) {
+        if (event.type != sf::Event::KeyPressed) {
+            return SceneCommand::None;
         }
 
-        window.clear(sf::Color(250, 248, 239));
-
-        if (state == GameState::Splash) {
-            window.draw(splashTitle);
-            window.draw(splashButton);
-            window.draw(splashButtonText);
-            window.display();
-            continue;
+        if (event.key.code == sf::Keyboard::Escape) {
+            session.clearSpawnAnimations();
+            return SceneCommand::ShowSplash;
         }
 
-        sf::RectangleShape panelBg({(float)width, (float)kTopPanelHeight});
+        if (const auto direction = mapDirection(event.key.code); direction.has_value()) {
+            session.applyMove(*direction);
+        }
+
+        return SceneCommand::None;
+    }
+
+    void render(sf::RenderWindow &window, const sf::Font &font, GameSession &session,
+                const float width) {
+        sf::RectangleShape panelBg({width, static_cast<float>(kTopPanelHeight)});
         panelBg.setFillColor({237, 224, 200});
         window.draw(panelBg);
 
-        scoreText.setString("Score: " + std::to_string(game.getScore()));
-        const auto scoreBounds = scoreText.getLocalBounds();
-        scoreText.setPosition(12.f,
-                              kTopPanelHeight / 2.f - (scoreBounds.top + scoreBounds.height / 2.f));
-        window.draw(scoreText);
+        const auto &game = session.game();
+        scoreText_.setString("Score: " + std::to_string(game.getScore()));
+        const auto scoreBounds = scoreText_.getLocalBounds();
+        scoreText_.setPosition(12.f, kTopPanelHeight / 2.f -
+                                         (scoreBounds.top + scoreBounds.height / 2.f));
+        window.draw(scoreText_);
 
         const auto &grid = game.getGrid();
-        for (int r = 0; r < kGridSize; ++r) {
-            for (int c = 0; c < kGridSize; ++c) {
-                const int value = grid[r][c];
+        auto &spawnAnimations = session.spawnAnimations();
+        for (int row = 0; row < kGridSize; ++row) {
+            for (int col = 0; col < kGridSize; ++col) {
+                const int value = grid[row][col];
                 float scale = 1.f;
 
-                const auto cellPos = std::make_pair(r, c);
-                auto animIt = spawnAnimations.find(cellPos);
-                if (animIt != spawnAnimations.end()) {
+                const auto cellPos = std::make_pair(row, col);
+                if (auto animIt = spawnAnimations.find(cellPos); animIt != spawnAnimations.end()) {
                     const float elapsed =
                         std::chrono::duration<float>(Clock::now() - animIt->second).count();
-                    if (elapsed < animationDuration) {
-                        scale = elapsed / animationDuration;
+                    if (elapsed < kSpawnAnimationDuration) {
+                        scale = elapsed / kSpawnAnimationDuration;
                     } else {
                         spawnAnimations.erase(animIt);
                     }
                 }
 
-                sf::RectangleShape cell({(float)kCellSize, (float)kCellSize});
+                sf::RectangleShape cell(
+                    {static_cast<float>(kCellSize), static_cast<float>(kCellSize)});
                 cell.setOrigin(kCellSize / 2.f, kCellSize / 2.f);
                 cell.setScale(scale, scale);
-                cell.setPosition(c * kCellSize + (c + 1) * kPadding + kCellSize / 2.f,
-                                 kTopPanelHeight + r * kCellSize + (r + 1) * kPadding +
+                cell.setPosition(col * kCellSize + (col + 1) * kPadding + kCellSize / 2.f,
+                                 kTopPanelHeight + row * kCellSize + (row + 1) * kPadding +
                                      kCellSize / 2.f);
                 cell.setFillColor(value ? getTileColor(value) : sf::Color(205, 193, 180));
                 window.draw(cell);
 
-                if (value) {
+                if (value != 0) {
                     sf::Text tileText(std::to_string(value), font, 32);
                     tileText.setFillColor(value <= 4 ? sf::Color::Black : sf::Color::White);
                     centerTextOrigin(tileText);
@@ -429,33 +265,226 @@ int run(const RunConfig &config) {
                 }
             }
         }
+    }
 
-        if (state == GameState::GameOver) {
-            window.draw(overFade);
+  private:
+    sf::Text scoreText_;
+};
 
-            overBox.setPosition(width / 2.f, height / 2.f - 5.f);
-            window.draw(overBox);
+class GameOverScene {
+  public:
+    GameOverScene(const sf::Font &font, const float width, const float height)
+        : overlay_({width, height}), box_({380.f, 250.f}), title_("Game Over", font, 40),
+          scoreText_("", font, 26), hintText_("N/Enter: New Game   Q/Esc: Quit", font, 16),
+          newGameText_("NEW GAME", font, 22), newGameButton_(createButtonForText(newGameText_)),
+          quitText_("QUIT", font, 22), quitButton_(createButtonForText(quitText_)), width_(width),
+          height_(height) {
+        overlay_.setFillColor(sf::Color(0, 0, 0, 150));
 
-            overText.setPosition(width / 2.f, height / 2.f - 82.f);
-            window.draw(overText);
+        box_.setFillColor(sf::Color::White);
+        box_.setOutlineThickness(4.f);
+        box_.setOutlineColor({200, 0, 0});
+        box_.setOrigin(box_.getSize() / 2.f);
 
-            overScoreText.setString("Final Score: " + std::to_string(game.getScore()));
-            centerTextOrigin(overScoreText);
-            overScoreText.setPosition(width / 2.f, height / 2.f - 36.f);
-            window.draw(overScoreText);
+        title_.setFillColor(sf::Color::Red);
+        title_.setStyle(sf::Text::Bold);
+        centerTextOrigin(title_);
 
-            overHintText.setPosition(width / 2.f, height / 2.f - 2.f);
-            window.draw(overHintText);
+        scoreText_.setFillColor(sf::Color(30, 30, 30));
+        scoreText_.setStyle(sf::Text::Bold);
 
-            newGameButton.setPosition(width / 2.f - 95.f, height / 2.f + 66.f);
-            newGameText.setPosition(newGameButton.getPosition());
-            window.draw(newGameButton);
-            window.draw(newGameText);
+        hintText_.setFillColor(sf::Color(80, 80, 80));
+        centerTextOrigin(hintText_);
 
-            quitButton.setPosition(width / 2.f + 95.f, height / 2.f + 66.f);
-            quitText.setPosition(quitButton.getPosition());
-            window.draw(quitButton);
-            window.draw(quitText);
+        newGameText_.setFillColor(sf::Color::White);
+        centerTextOrigin(newGameText_);
+        newGameButton_.setFillColor(kPrimaryButtonColor);
+
+        quitText_.setFillColor(sf::Color::White);
+        centerTextOrigin(quitText_);
+        quitButton_.setFillColor(kDangerButtonColor);
+
+        layout();
+    }
+
+    SceneCommand handleEvent(const sf::Event &event, const sf::RenderWindow &window) const {
+        if (event.type == sf::Event::KeyPressed) {
+            if (event.key.code == sf::Keyboard::N || event.key.code == sf::Keyboard::Enter) {
+                return SceneCommand::RestartGame;
+            }
+            if (event.key.code == sf::Keyboard::Q || event.key.code == sf::Keyboard::Escape) {
+                return SceneCommand::Quit;
+            }
+        }
+
+        if (event.type == sf::Event::MouseButtonPressed &&
+            event.mouseButton.button == sf::Mouse::Left) {
+            const sf::Vector2f clickPos =
+                window.mapPixelToCoords({event.mouseButton.x, event.mouseButton.y});
+            if (newGameButton_.getGlobalBounds().contains(clickPos)) {
+                return SceneCommand::RestartGame;
+            }
+            if (quitButton_.getGlobalBounds().contains(clickPos)) {
+                return SceneCommand::Quit;
+            }
+        }
+
+        return SceneCommand::None;
+    }
+
+    void updateHover(const sf::Vector2f &mousePos) {
+        updateButtonColor(newGameButton_, newGameButton_.getGlobalBounds().contains(mousePos),
+                          kPrimaryButtonColor, kPrimaryButtonHoverColor);
+        updateButtonColor(quitButton_, quitButton_.getGlobalBounds().contains(mousePos),
+                          kDangerButtonColor, kDangerButtonHoverColor);
+    }
+
+    void render(sf::RenderWindow &window, const int score) {
+        window.draw(overlay_);
+        window.draw(box_);
+        window.draw(title_);
+
+        scoreText_.setString("Final Score: " + std::to_string(score));
+        centerTextOrigin(scoreText_);
+        scoreText_.setPosition(width_ / 2.f, height_ / 2.f - 36.f);
+        window.draw(scoreText_);
+
+        window.draw(hintText_);
+        window.draw(newGameButton_);
+        window.draw(newGameText_);
+        window.draw(quitButton_);
+        window.draw(quitText_);
+    }
+
+  private:
+    void layout() {
+        box_.setPosition(width_ / 2.f, height_ / 2.f - 5.f);
+        title_.setPosition(width_ / 2.f, height_ / 2.f - 82.f);
+        hintText_.setPosition(width_ / 2.f, height_ / 2.f - 2.f);
+
+        newGameButton_.setPosition(width_ / 2.f - 95.f, height_ / 2.f + 66.f);
+        newGameText_.setPosition(newGameButton_.getPosition());
+        quitButton_.setPosition(width_ / 2.f + 95.f, height_ / 2.f + 66.f);
+        quitText_.setPosition(quitButton_.getPosition());
+    }
+
+    sf::RectangleShape overlay_;
+    sf::RectangleShape box_;
+    sf::Text title_;
+    sf::Text scoreText_;
+    sf::Text hintText_;
+    sf::Text newGameText_;
+    sf::RectangleShape newGameButton_;
+    sf::Text quitText_;
+    sf::RectangleShape quitButton_;
+    float width_;
+    float height_;
+};
+
+void applySceneCommand(SceneCommand command, SceneId &scene, GameSession &session,
+                       sf::RenderWindow &window) {
+    switch (command) {
+    case SceneCommand::None:
+        return;
+    case SceneCommand::StartGame:
+    case SceneCommand::RestartGame:
+        session.resetGame();
+        scene = SceneId::Playing;
+        return;
+    case SceneCommand::ShowSplash:
+        scene = SceneId::Splash;
+        return;
+    case SceneCommand::Quit:
+        window.close();
+        return;
+    }
+}
+
+} // namespace
+
+namespace app {
+
+int run(const RunConfig &config) {
+    const auto width =
+        static_cast<unsigned int>(kGridSize * kCellSize + (kGridSize + 1) * kPadding);
+    const auto height = static_cast<unsigned int>(kTopPanelHeight + kGridSize * kCellSize +
+                                                  (kGridSize + 1) * kPadding);
+
+    sf::RenderWindow window({width, height}, "2048", sf::Style::Titlebar | sf::Style::Close);
+    window.setVerticalSyncEnabled(config.vSyncEnabled);
+    if (config.frameLimit.has_value()) {
+        window.setFramerateLimit(*config.frameLimit);
+    }
+
+    const auto fontResolution = resolveAssetPath(kFontRelativePath);
+
+    sf::Font font;
+    if (!fontResolution.resolvedPath.has_value() ||
+        !font.loadFromFile(fontResolution.resolvedPath->string())) {
+        std::cerr << "Font could not be loaded. Tried:\n";
+        for (const auto &candidate : fontResolution.candidates) {
+            std::cerr << "  - " << candidate.string() << "\n";
+        }
+        return 1;
+    }
+
+    GameSession session(config);
+    SplashScene splashScene(font, static_cast<float>(width), static_cast<float>(height));
+    PlayingScene playingScene(font);
+    GameOverScene gameOverScene(font, static_cast<float>(width), static_cast<float>(height));
+    SceneId scene = SceneId::Splash;
+
+    while (window.isOpen()) {
+        sf::Event event;
+        while (window.pollEvent(event)) {
+            if (event.type == sf::Event::Closed) {
+                window.close();
+                continue;
+            }
+
+            SceneCommand command = SceneCommand::None;
+            switch (scene) {
+            case SceneId::Splash:
+                command = splashScene.handleEvent(event, window);
+                break;
+            case SceneId::Playing:
+                command = playingScene.handleEvent(event, session);
+                break;
+            case SceneId::GameOver:
+                command = gameOverScene.handleEvent(event, window);
+                break;
+            }
+
+            applySceneCommand(command, scene, session, window);
+        }
+
+        if (!window.isOpen()) {
+            break;
+        }
+
+        const sf::Vector2f mousePos = window.mapPixelToCoords(sf::Mouse::getPosition(window));
+        if (scene == SceneId::Splash) {
+            splashScene.updateHover(mousePos);
+        } else if (scene == SceneId::GameOver) {
+            gameOverScene.updateHover(mousePos);
+        }
+
+        if (scene == SceneId::Playing && session.game().isGameOver()) {
+            session.clearSpawnAnimations();
+            scene = SceneId::GameOver;
+        }
+
+        window.clear(sf::Color(250, 248, 239));
+
+        if (scene == SceneId::Splash) {
+            splashScene.render(window);
+            window.display();
+            continue;
+        }
+
+        playingScene.render(window, font, session, static_cast<float>(width));
+        if (scene == SceneId::GameOver) {
+            gameOverScene.render(window, session.game().getScore());
         }
 
         window.display();
