@@ -1,227 +1,97 @@
-# 2048 Project (C++ / SFML)
+# sfml-2048 | Enterprise C++ Game Showcase
 
 [![CI](https://github.com/EnesGoker/sfml-2048/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/EnesGoker/sfml-2048/actions/workflows/ci.yml)
 [![Release](https://github.com/EnesGoker/sfml-2048/actions/workflows/release.yml/badge.svg)](https://github.com/EnesGoker/sfml-2048/actions/workflows/release.yml)
 [![License](https://img.shields.io/github/license/EnesGoker/sfml-2048)](LICENSE)
+![C++](https://img.shields.io/badge/C%2B%2B-20-00599C)
+![CMake](https://img.shields.io/badge/CMake-3.24%2B-064F8C)
+![SFML](https://img.shields.io/badge/SFML-2.6.2-8CC445)
 
-A desktop implementation of 2048 written in C++. The goal of this repository is to evolve into an enterprise-grade portfolio project with reproducible builds, tests, CI, and release automation.
+## TR
 
-## Screenshot
+`sfml-2048`, klasik 2048 oyununu modern C++ yaklaşımıyla yeniden yorumlayan bir masaüstü proje vitrini.
+Amaç sadece oyun geliştirmek değil; test edilebilir mimari, CI disiplini ve release otomasyonu ile profesyonel bir mühendislik standardı göstermek.
+
+## EN
+
+`sfml-2048` is a desktop showcase project that reimagines the classic 2048 game with modern C++ practices.
+The goal is not only to build a game, but also to demonstrate professional engineering standards through testable architecture, CI discipline, and release automation.
+
+## Preview
 
 ![Gameplay preview](docs/screenshots/gameplay.png)
 
-## Current Features
+## Highlights | Öne Çıkanlar
 
-- 4x4 board with classic 2048 merge rules
-- Score tracking
-- Splash screen + game over overlay
-- Keyboard controls (arrow keys)
-- Spawn tile animation
+- Deterministic core engine (`seed` support) | Deterministik core motor (`seed` desteği)
+- SFML-independent game logic for unit tests | Unit testler için SFML’den bağımsız oyun mantığı
+- Multi-platform CI (Ubuntu, macOS, Windows) | Çok platformlu CI (Ubuntu, macOS, Windows)
+- Automated release artifacts and versioning | Otomatik release artifact’ları ve sürümleme
+- Clean project structure for portfolio presentation | Portfolyo için temiz ve okunabilir proje yapısı
 
-## Controls
+## Tech Stack | Teknoloji Yığını
 
-- `Up Arrow`: move up
-- `Down Arrow`: move down
-- `Left Arrow`: move left
-- `Right Arrow`: move right
-- `Esc` (during game): return to splash menu
-- `N` or `Enter` (game over): start a new game
-- `Q` or `Esc` (game over): quit
+- Language: C++20
+- UI/Rendering: SFML 2.6.2
+- Build System: CMake + CMake Presets
+- Dependency Management: vcpkg manifest mode
+- Tests: Catch2 + CTest
+- CI/CD: GitHub Actions
 
-## Build
+## Quick Start | Hızlı Başlangıç
 
-The project now uses CMake presets.
-
-### Prerequisites
-
-- CMake 3.24+
-- C++20 compatible compiler
-
-### Option A: System dependencies (quick local build)
-
-macOS:
+### macOS / Linux
 
 ```bash
-brew install sfml
-cmake --preset debug
-cmake --build --preset build-debug
-./build/debug/sfml_2048
-```
-
-Linux (Debian/Ubuntu example):
-
-```bash
-sudo apt-get install libsfml-dev
-cmake --preset debug
-cmake --build --preset build-debug
-./build/debug/sfml_2048
-```
-
-Windows (Visual Studio Developer Prompt example):
-
-```bat
-cmake --preset debug
-cmake --build --preset build-debug
-build\\debug\\sfml_2048.exe
-```
-
-### Option B: vcpkg manifest mode (recommended for reproducible setup)
-
-macOS/Linux:
-
-```bash
-git clone https://github.com/microsoft/vcpkg.git "$HOME/vcpkg"
-"$HOME/vcpkg/bootstrap-vcpkg.sh"
-brew install pkg-config # macOS only
-export VCPKG_ROOT="$HOME/vcpkg"
 cmake --preset vcpkg-debug
 cmake --build --preset build-vcpkg-debug
 ./build/vcpkg-debug/sfml_2048
 ```
 
-Windows:
+### Windows
 
 ```bat
-git clone https://github.com/microsoft/vcpkg.git C:\\vcpkg
-C:\\vcpkg\\bootstrap-vcpkg.bat
-set VCPKG_ROOT=C:\\vcpkg
 cmake --preset vcpkg-debug
 cmake --build --preset build-vcpkg-debug
-build\\vcpkg-debug\\sfml_2048.exe
+build\vcpkg-debug\sfml_2048.exe
 ```
 
-`vcpkg.json` is provided in the repository root and pins `sfml` to `2.6.2` via manifest versioning.
-
-## CI Pipeline
-
-GitHub Actions workflow: `.github/workflows/ci.yml`
-
-- `format`: `clang-format` policy check
-- `build-and-test`: matrix build + test on Ubuntu, macOS, Windows
-- `sanitizers`: ASan/UBSan build + test on Ubuntu
-- `coverage`: gcovr report for core module with line coverage threshold (`>= 80%`)
-
-One-time branch protection setup (maintainer):
+## CLI Options | Çalıştırma Parametreleri
 
 ```bash
-./scripts/apply_branch_protection.sh <owner/repo> single-maintainer
+--seed <uint32>    Deterministic run | Deterministik oyun akışı
+--fps <uint>       Frame limit       | FPS limiti
+--vsync            Enable VSync      | VSync aç
+--no-vsync         Disable VSync     | VSync kapat
+--help             Show help         | Yardım göster
 ```
 
-Team setup (enforced reviews + admin enforcement):
+## Controls | Kontroller
 
-```bash
-./scripts/apply_branch_protection.sh <owner/repo> team
-```
+- Arrow keys: move tiles | Yön tuşları: taşları hareket ettir
+- `Esc` (in-game): back to splash | `Esc` (oyun içinde): ana ekrana dön
+- `N` or `Enter` (game over): new game | `N` veya `Enter` (oyun bitince): yeni oyun
+- `Q` or `Esc` (game over): quit | `Q` veya `Esc` (oyun bitince): çıkış
 
-## Engineering Docs
+## Engineering Quality | Mühendislik Kalitesi
 
-- Architecture: `docs/architecture.md`
-- Testing strategy: `docs/testing.md`
-- Maintenance playbook: `docs/maintenance.md`
-- Contribution guide: `CONTRIBUTING.md`
-- Security policy: `SECURITY.md`
-- Third-party notices: `THIRD_PARTY_NOTICES.md`
+- Core rules are isolated in `src/core` and testable without SFML.
+- CI gates include format checks, static analysis, cross-platform build/test, sanitizers, and coverage.
+- Releases are versioned and distributed as downloadable artifacts.
 
-## Packaging and Release
+## Documentation | Dokümantasyon
 
-Local release package (ZIP):
+- Architecture: [docs/architecture.md](docs/architecture.md)
+- Testing Strategy: [docs/testing.md](docs/testing.md)
+- Maintenance Playbook: [docs/maintenance.md](docs/maintenance.md)
+- Contributing: [CONTRIBUTING.md](CONTRIBUTING.md)
+- Security: [SECURITY.md](SECURITY.md)
+- Third-Party Notices: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)
 
-```bash
-cmake --preset release
-cmake --build --preset build-release
-ctest --test-dir build/release --output-on-failure
-cpack --config build/release/CPackConfig.cmake
-```
+## Roadmap | Yol Haritası
 
-Optional install staging check:
+Current progress and upcoming improvements are tracked in [CHANGELOG.md](CHANGELOG.md).
 
-```bash
-cmake --install build/release --prefix build/release/install
-```
+## License
 
-Automated GitHub Release:
-
-- Workflow: `.github/workflows/release.yml`
-- Trigger: push a tag in `vX.Y.Z` format
-- Guardrail: tag version must match `VERSION` file
-- Outputs: cross-platform ZIP artifacts (Ubuntu, macOS, Windows) attached to the GitHub Release
-
-Example:
-
-```bash
-git tag v0.1.0
-git push origin v0.1.0
-```
-
-Source-only package (clean zip without build artifacts):
-
-```bash
-./scripts/package_source.sh
-```
-
-This script excludes `build/`, `vcpkg_installed/`, `_CPack_Packages/`, `*.zip`, and macOS metadata (`__MACOSX`).
-
-### Deterministic Run (Seeded)
-
-Use a fixed seed to reproduce the same random tile sequence:
-
-```bash
-./build/debug/sfml_2048 --seed 1234
-```
-
-Runtime tuning examples:
-
-```bash
-./build/debug/sfml_2048 --no-vsync --fps 120
-./build/debug/sfml_2048 --vsync
-```
-
-### Core Test Target (SFML-independent)
-
-```bash
-cmake -S . -B build
-cmake --build build
-ctest --test-dir build --output-on-failure
-```
-
-List test names:
-
-```bash
-./build/core_unit_tests --list-tests
-```
-
-Deterministic snapshot check only:
-
-```bash
-./build/core_unit_tests "[golden]"
-```
-
-### Static Format Check
-
-```bash
-./scripts/check_format.sh
-```
-
-### Sanitizer Run (Linux local option)
-
-```bash
-cmake -S . -B build/sanitizers \
-  -DCMAKE_BUILD_TYPE=Debug \
-  -DCMAKE_TOOLCHAIN_FILE="$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake" \
-  -DSFML_2048_ENABLE_SANITIZERS=ON
-cmake --build build/sanitizers
-ctest --test-dir build/sanitizers --output-on-failure
-```
-
-## Project Structure (Current)
-
-- `src/core/Game.hpp` + `src/core/Game.cpp`: SFML-independent game engine
-- `src/app/App.hpp` + `src/app/App.cpp`: SFML app layer (window/input/render)
-- `src/app/main.cpp`: executable entry point
-- `assets/fonts/`: runtime font assets
-- `CMakeLists.txt`: build configuration
-- `CMakePresets.json`: standard Debug/Release and vcpkg presets
-
-## Roadmap
-
-See `CHANGELOG.md` and ongoing milestone plan in project discussions.
+Licensed under the MIT License. See [LICENSE](LICENSE).
