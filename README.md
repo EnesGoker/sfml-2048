@@ -169,6 +169,13 @@ Use a fixed seed to reproduce the same random tile sequence:
 ./build/debug/sfml_2048 --seed 1234
 ```
 
+Runtime tuning examples:
+
+```bash
+./build/debug/sfml_2048 --no-vsync --fps 120
+./build/debug/sfml_2048 --vsync
+```
+
 ### Core Test Target (SFML-independent)
 
 ```bash
