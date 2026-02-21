@@ -117,6 +117,7 @@ Team setup (enforced reviews + admin enforcement):
 
 - Architecture: `docs/architecture.md`
 - Testing strategy: `docs/testing.md`
+- Maintenance playbook: `docs/maintenance.md`
 - Contribution guide: `CONTRIBUTING.md`
 - Security policy: `SECURITY.md`
 - Third-party notices: `THIRD_PARTY_NOTICES.md`
