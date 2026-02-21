@@ -1,97 +1,149 @@
-# sfml-2048 | Enterprise C++ Game Showcase
+# sfml-2048
+
+> A classic 2048 clone built with modern C++ — designed from the ground up for testability, cross-platform CI, and clean architecture.
+
+![Gameplay](docs/screenshots/gameplay.png)
 
 [![CI](https://github.com/EnesGoker/sfml-2048/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/EnesGoker/sfml-2048/actions/workflows/ci.yml)
 [![Release](https://github.com/EnesGoker/sfml-2048/actions/workflows/release.yml/badge.svg)](https://github.com/EnesGoker/sfml-2048/actions/workflows/release.yml)
-[![License](https://img.shields.io/github/license/EnesGoker/sfml-2048)](LICENSE)
-![C++](https://img.shields.io/badge/C%2B%2B-20-00599C)
-![CMake](https://img.shields.io/badge/CMake-3.24%2B-064F8C)
-![SFML](https://img.shields.io/badge/SFML-2.6.2-8CC445)
+[![License: MIT](https://img.shields.io/github/license/EnesGoker/sfml-2048)](LICENSE)
+[![C++20](https://img.shields.io/badge/C%2B%2B-20-005999)](https://en.cppreference.com/w/cpp/20)
+[![SFML 2.6.2](https://img.shields.io/badge/SFML-2.6.2-8CC445)](https://www.sfml-dev.org/)
 
-## TR
+---
 
-`sfml-2048`, klasik 2048 oyununu modern C++ yaklaşımıyla yeniden yorumlayan bir masaüstü proje vitrini.
-Amaç sadece oyun geliştirmek değil; test edilebilir mimari, CI disiplini ve release otomasyonu ile profesyonel bir mühendislik standardı göstermek.
+## What is this?
 
-## EN
+This is not just a 2048 clone. It's a **portfolio-grade C++ project** that demonstrates:
 
-`sfml-2048` is a desktop showcase project that reimagines the classic 2048 game with modern C++ practices.
-The goal is not only to build a game, but also to demonstrate professional engineering standards through testable architecture, CI discipline, and release automation.
+- A game engine core that is **completely decoupled from SFML** and fully unit-testable
+- A **multi-platform CI pipeline** covering Ubuntu, macOS, and Windows
+- **Deterministic gameplay** via seed support — every run is reproducible
+- Automated versioning and release artifact distribution
 
-## Preview
+If you're here to play the game, great. If you're here to understand how it's built, read on.
 
-![Gameplay preview](docs/screenshots/gameplay.png)
+---
 
-## Highlights | Öne Çıkanlar
+## Getting Started
 
-- Deterministic core engine (`seed` support) | Deterministik core motor (`seed` desteği)
-- SFML-independent game logic for unit tests | Unit testler için SFML’den bağımsız oyun mantığı
-- Multi-platform CI (Ubuntu, macOS, Windows) | Çok platformlu CI (Ubuntu, macOS, Windows)
-- Automated release artifacts and versioning | Otomatik release artifact’ları ve sürümleme
-- Clean project structure for portfolio presentation | Portfolyo için temiz ve okunabilir proje yapısı
+### Prerequisites
 
-## Tech Stack | Teknoloji Yığını
+- CMake 3.24+
+- vcpkg (with `VCPKG_ROOT` set)
+- A C++20-capable compiler (GCC 11+, Clang 13+, MSVC 2022+)
 
-- Language: C++20
-- UI/Rendering: SFML 2.6.2
-- Build System: CMake + CMake Presets
-- Dependency Management: vcpkg manifest mode
-- Tests: Catch2 + CTest
-- CI/CD: GitHub Actions
+### Build & Run
 
-## Quick Start | Hızlı Başlangıç
-
-### macOS / Linux
-
+**macOS / Linux**
 ```bash
 cmake --preset vcpkg-debug
 cmake --build --preset build-vcpkg-debug
 ./build/vcpkg-debug/sfml_2048
 ```
 
-### Windows
-
+**Windows**
 ```bat
 cmake --preset vcpkg-debug
 cmake --build --preset build-vcpkg-debug
 build\vcpkg-debug\sfml_2048.exe
 ```
 
-## CLI Options | Çalıştırma Parametreleri
+### CLI Options
 
-```bash
---seed <uint32>    Deterministic run | Deterministik oyun akışı
---fps <uint>       Frame limit       | FPS limiti
---vsync            Enable VSync      | VSync aç
---no-vsync         Disable VSync     | VSync kapat
---help             Show help         | Yardım göster
+| Flag | Description |
+|---|---|
+| `--seed <uint32>` | Run with a fixed seed for deterministic gameplay |
+| `--fps <uint>` | Set frame rate cap |
+| `--vsync` | Enable vertical sync |
+| `--no-vsync` | Disable vertical sync |
+| `--help` | Show usage |
+
+---
+
+## How to Play
+
+| Input | Action |
+|---|---|
+| Arrow keys | Move tiles |
+| `Esc` (in-game) | Return to splash screen |
+| `N` / `Enter` (game over) | Start a new game |
+| `Q` / `Esc` (game over) | Quit |
+
+---
+
+## Architecture
+
+The project is split into two clear layers:
+
+```text
+src/
+├── core/     <- Pure game logic. No SFML. Fully testable.
+└── app/      <- SFML rendering, input handling, window management
 ```
 
-## Controls | Kontroller
+The `core` layer knows nothing about SFML — it operates on plain data structures and can be exercised by unit tests without a display. The `app` layer owns all rendering and delegates game state changes back to `core`.
 
-- Arrow keys: move tiles | Yön tuşları: taşları hareket ettir
-- `Esc` (in-game): back to splash | `Esc` (oyun içinde): ana ekrana dön
-- `N` or `Enter` (game over): new game | `N` veya `Enter` (oyun bitince): yeni oyun
-- `Q` or `Esc` (game over): quit | `Q` veya `Esc` (oyun bitince): çıkış
+This separation means:
+- You can swap the renderer without touching game logic
+- Unit tests are fast and dependency-free
+- Business rules are easy to reason about in isolation
 
-## Engineering Quality | Mühendislik Kalitesi
+For full details, see [docs/architecture.md](docs/architecture.md).
 
-- Core rules are isolated in `src/core` and testable without SFML.
-- CI gates include format checks, static analysis, cross-platform build/test, sanitizers, and coverage.
-- Releases are versioned and distributed as downloadable artifacts.
+---
 
-## Documentation | Dokümantasyon
+## Testing
 
-- Architecture: [docs/architecture.md](docs/architecture.md)
-- Testing Strategy: [docs/testing.md](docs/testing.md)
-- Maintenance Playbook: [docs/maintenance.md](docs/maintenance.md)
-- Contributing: [CONTRIBUTING.md](CONTRIBUTING.md)
-- Security: [SECURITY.md](SECURITY.md)
-- Third-Party Notices: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)
+Tests are written with **Catch2** and run via **CTest**.
 
-## Roadmap | Yol Haritası
+```bash
+ctest --test-dir build/vcpkg-debug --output-on-failure
+```
 
-Current progress and upcoming improvements are tracked in [CHANGELOG.md](CHANGELOG.md).
+The CI pipeline runs tests under multiple sanitizers (AddressSanitizer, UBSanitizer) and generates coverage reports on every push/PR. See [docs/testing.md](docs/testing.md) for the full strategy.
+
+---
+
+## CI / CD
+
+Every pull request goes through:
+
+1. `clang-format` check
+2. Static analysis
+3. Cross-platform build (Ubuntu · macOS · Windows)
+4. Unit tests + sanitizers
+5. Coverage report
+
+Pushing a `vX.Y.Z` tag triggers an automated release with downloadable binaries for all three platforms.
+
+---
+
+## Tech Stack
+
+| | |
+|---|---|
+| Language | C++20 |
+| Graphics / Input | SFML 2.6.2 |
+| Build System | CMake + CMake Presets |
+| Dependency Management | vcpkg (manifest mode) |
+| Testing | Catch2 + CTest |
+| CI/CD | GitHub Actions |
+
+---
+
+## Documentation
+
+- [Architecture](docs/architecture.md)
+- [Testing Strategy](docs/testing.md)
+- [Maintenance Playbook](docs/maintenance.md)
+- [Changelog](CHANGELOG.md)
+- [Contributing](CONTRIBUTING.md)
+- [Security Policy](SECURITY.md)
+- [Third-Party Notices](THIRD_PARTY_NOTICES.md)
+
+---
 
 ## License
 
-Licensed under the MIT License. See [LICENSE](LICENSE).
+MIT — see [LICENSE](LICENSE) for details.
