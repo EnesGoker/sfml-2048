@@ -12,13 +12,12 @@
 namespace {
 
 void printUsage(std::ostream &out) {
-    out << "Usage: sfml_2048 [options]\n"
-        << "Options:\n"
-        << "  --seed <uint32>    Start game with deterministic seed\n"
-        << "  --fps <uint>       Set frame limit (0 disables limit)\n"
-        << "  --vsync            Enable vertical sync (default)\n"
-        << "  --no-vsync         Disable vertical sync\n"
-        << "  --help             Show this help message\n";
+    out << "Kullanim: sfml_2048 [secenekler]\n"
+        << "Secenekler:\n"
+        << "  --fps <uint>       Kare hizini ayarla (0 = sinirsiz)\n"
+        << "  --vsync            Dikey senkronu ac (varsayilan)\n"
+        << "  --no-vsync         Dikey senkronu kapat\n"
+        << "  --help             Bu yardim mesajini goster\n";
 }
 
 bool parseUnsignedValue(const std::string_view text, unsigned int &value) {
@@ -38,16 +37,6 @@ bool parseUnsignedValue(const std::string_view text, unsigned int &value) {
     return true;
 }
 
-bool parseUint32Value(const std::string_view text, std::uint32_t &value) {
-    unsigned int parsed = 0;
-    if (!parseUnsignedValue(text, parsed) || parsed > std::numeric_limits<std::uint32_t>::max()) {
-        return false;
-    }
-
-    value = static_cast<std::uint32_t>(parsed);
-    return true;
-}
-
 } // namespace
 
 int main(int argc, char *argv[]) {
@@ -61,30 +50,15 @@ int main(int argc, char *argv[]) {
             return 0;
         }
 
-        if (arg == "--seed") {
-            if (i + 1 >= argc) {
-                std::cerr << "--seed requires a value\n";
-                return 2;
-            }
-
-            std::uint32_t seed = 0;
-            if (!parseUint32Value(argv[++i], seed)) {
-                std::cerr << "invalid seed value\n";
-                return 2;
-            }
-            config.seed = seed;
-            continue;
-        }
-
         if (arg == "--fps") {
             if (i + 1 >= argc) {
-                std::cerr << "--fps requires a value\n";
+                std::cerr << "--fps bir deger gerektirir\n";
                 return 2;
             }
 
             unsigned int fps = 0;
             if (!parseUnsignedValue(argv[++i], fps)) {
-                std::cerr << "invalid fps value\n";
+                std::cerr << "gecersiz fps degeri\n";
                 return 2;
             }
             config.frameLimit = fps;
@@ -101,7 +75,7 @@ int main(int argc, char *argv[]) {
             continue;
         }
 
-        std::cerr << "Unknown argument: " << arg << "\n";
+        std::cerr << "Bilinmeyen arguman: " << arg << "\n";
         printUsage(std::cerr);
         return 2;
     }

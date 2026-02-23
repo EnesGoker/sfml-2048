@@ -69,18 +69,31 @@ function(enable_project_coverage target_name)
     endif()
 endfunction()
 
-find_package(SFML 2.5 COMPONENTS graphics window system CONFIG QUIET)
+find_package(SFML 2.5 COMPONENTS graphics window system audio CONFIG QUIET)
 if (NOT SFML_FOUND)
-    find_package(SFML 2.5 COMPONENTS graphics window system REQUIRED)
+    find_package(SFML 2.5 COMPONENTS graphics window system audio REQUIRED)
+endif()
+
+find_package(nlohmann_json CONFIG QUIET)
+if (NOT nlohmann_json_FOUND)
+    include(FetchContent)
+    FetchContent_Declare(
+        nlohmann_json
+        GIT_REPOSITORY https://github.com/nlohmann/json.git
+        GIT_TAG v3.12.0
+    )
+    FetchContent_MakeAvailable(nlohmann_json)
 endif()
 
 add_library(game_core
     src/core/Game.cpp
+    src/core/ScoreManager.cpp
 )
 
 target_include_directories(game_core
     PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
+target_link_libraries(game_core PUBLIC nlohmann_json::nlohmann_json)
 
 enable_project_warnings(game_core)
 enable_project_sanitizers(game_core)
@@ -89,15 +102,16 @@ enable_project_coverage(game_core)
 add_executable(sfml_2048
     src/app/main.cpp
     src/app/AssetResolver.cpp
+    src/app/SoundManager.cpp
     src/app/App.cpp
 )
 
 target_link_libraries(sfml_2048 PRIVATE game_core)
 
 if (TARGET SFML::Graphics)
-    target_link_libraries(sfml_2048 PRIVATE SFML::Graphics SFML::Window SFML::System)
+    target_link_libraries(sfml_2048 PRIVATE SFML::Graphics SFML::Window SFML::System SFML::Audio)
 elseif (TARGET sfml-graphics)
-    target_link_libraries(sfml_2048 PRIVATE sfml-graphics sfml-window sfml-system)
+    target_link_libraries(sfml_2048 PRIVATE sfml-graphics sfml-window sfml-system sfml-audio)
 else()
     target_link_libraries(sfml_2048 PRIVATE ${SFML_LIBRARIES})
 endif()

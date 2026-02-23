@@ -26,3 +26,7 @@ __MACOSX/
 
 # OS files
 .DS_Store
+
+# Local runtime data
+scores.json
+settings.json
