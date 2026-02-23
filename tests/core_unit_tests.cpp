@@ -1,15 +1,27 @@
 #include "core/Game.hpp"
-
+#include "core/ScoreManager.hpp"
 #include <catch2/catch_test_macros.hpp>
-
 #include <array>
+#include <chrono>
 #include <cstdint>
+#include <filesystem>
+#include <fstream>
+#include <optional>
 #include <random>
+#include <string>
+#include <vector>
 
 namespace {
 
 using core2048::Direction;
 using core2048::Game;
+using core2048::ScoreManager;
+
+std::filesystem::path makeUniqueTempFilePath(const std::string &suffix) {
+    const auto timestamp = std::chrono::high_resolution_clock::now().time_since_epoch().count();
+    return std::filesystem::temp_directory_path() /
+           ("sfml_2048_" + suffix + "_" + std::to_string(timestamp) + ".json");
+}
 
 constexpr std::array<Direction, 10> kGoldenMoveSequence = {
     Direction::Up,   Direction::Left, Direction::Down,  Direction::Right, Direction::Up,
@@ -185,6 +197,124 @@ TEST_CASE("score accumulation is correct across moves", "[score]") {
     REQUIRE_FALSE(second.moved);
     REQUIRE(second.scoreDelta == 0);
     REQUIRE(game.getScore() == 12);
+}
+
+TEST_CASE("score manager saves and loads score entries", "[score-manager]") {
+    const auto filePath = makeUniqueTempFilePath("roundtrip");
+    const auto cleanup = [&]() {
+        std::error_code ec;
+        std::filesystem::remove(filePath, ec);
+    };
+
+    cleanup();
+
+    ScoreManager writer(filePath);
+    writer.addScore(128, "Enes", "2026-02-21T10:00:00Z");
+    writer.addScore(256, "Inci", "2026-02-21T10:10:00Z");
+    REQUIRE(writer.save());
+
+    ScoreManager reader(filePath);
+    REQUIRE(reader.load());
+    REQUIRE(reader.topScores().size() == 2);
+    REQUIRE(reader.bestScore() == 256);
+
+    REQUIRE(reader.topScores()[0].score == 256);
+    REQUIRE(reader.topScores()[0].playedAtUtc == "2026-02-21T10:10:00Z");
+    REQUIRE(reader.topScores()[0].playerName == "Inci");
+
+    REQUIRE(reader.topScores()[1].score == 128);
+    REQUIRE(reader.topScores()[1].playedAtUtc == "2026-02-21T10:00:00Z");
+    REQUIRE(reader.topScores()[1].playerName == "Enes");
+
+    cleanup();
+}
+
+TEST_CASE("score manager keeps top 5 entries sorted by score", "[score-manager]") {
+    const auto filePath = makeUniqueTempFilePath("top5");
+    const auto cleanup = [&]() {
+        std::error_code ec;
+        std::filesystem::remove(filePath, ec);
+    };
+
+    cleanup();
+
+    ScoreManager manager(filePath);
+    manager.addScore(40, "Aylin", "2026-02-21T10:00:00Z");
+    manager.addScore(90, "Mert", "2026-02-21T10:01:00Z");
+    manager.addScore(10, "Ece", "2026-02-21T10:02:00Z");
+    manager.addScore(70, "Can", "2026-02-21T10:03:00Z");
+    manager.addScore(20, "Sena", "2026-02-21T10:04:00Z");
+    manager.addScore(50, "Arda", "2026-02-21T10:05:00Z");
+    manager.addScore(80, "Selin", "2026-02-21T10:06:00Z");
+
+    const std::vector<int> expectedScores = {90, 80, 70, 50, 40};
+    REQUIRE(manager.topScores().size() == expectedScores.size());
+    for (std::size_t i = 0; i < expectedScores.size(); ++i) {
+        REQUIRE(manager.topScores()[i].score == expectedScores[i]);
+    }
+    REQUIRE(manager.bestScore() == 90);
+
+    REQUIRE(manager.save());
+
+    ScoreManager reloaded(filePath);
+    REQUIRE(reloaded.load());
+    REQUIRE(reloaded.topScores().size() == expectedScores.size());
+    for (std::size_t i = 0; i < expectedScores.size(); ++i) {
+        REQUIRE(reloaded.topScores()[i].score == expectedScores[i]);
+    }
+
+    cleanup();
+}
+
+TEST_CASE("score manager handles missing and malformed files", "[score-manager]") {
+    const auto missingFilePath = makeUniqueTempFilePath("missing");
+    {
+        std::error_code ec;
+        std::filesystem::remove(missingFilePath, ec);
+    }
+    ScoreManager missingManager(missingFilePath);
+    REQUIRE(missingManager.load());
+    REQUIRE(missingManager.topScores().empty());
+
+    const auto malformedFilePath = makeUniqueTempFilePath("malformed");
+    {
+        std::ofstream malformed(malformedFilePath);
+        malformed << "{ this is not valid json";
+    }
+
+    ScoreManager malformedManager(malformedFilePath);
+    REQUIRE_FALSE(malformedManager.load());
+
+    {
+        std::error_code ec;
+        std::filesystem::remove(missingFilePath, ec);
+        std::filesystem::remove(malformedFilePath, ec);
+    }
+}
+
+TEST_CASE("score manager loads legacy entries without player names", "[score-manager]") {
+    const auto legacyFilePath = makeUniqueTempFilePath("legacy_scores");
+    {
+        std::ofstream legacy(legacyFilePath);
+        legacy << "{\n"
+               << "  \"scores\": [\n"
+               << "    {\"score\": 512, \"played_at\": \"2026-02-20T10:00:00Z\", \"seed\": "
+                  "1234},\n"
+               << "    {\"score\": 256, \"played_at\": \"2026-02-19T10:00:00Z\"}\n"
+               << "  ]\n"
+               << "}\n";
+    }
+
+    ScoreManager legacyManager(legacyFilePath);
+    REQUIRE(legacyManager.load());
+    REQUIRE(legacyManager.topScores().size() == 2);
+    REQUIRE(legacyManager.topScores()[0].score == 512);
+    REQUIRE(legacyManager.topScores()[0].playerName == "Oyuncu");
+    REQUIRE(legacyManager.topScores()[1].score == 256);
+    REQUIRE(legacyManager.topScores()[1].playerName == "Oyuncu");
+
+    std::error_code ec;
+    std::filesystem::remove(legacyFilePath, ec);
 }
 
 TEST_CASE("seed=1234 with 10 moves matches expected snapshot", "[golden]") {

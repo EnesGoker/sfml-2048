@@ -34,6 +34,9 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - Release artifacts now include `SHA256SUMS.txt` and SPDX SBOM files.
 - Property-style core tests for invariant preservation and left/right mirror symmetry.
 - Repository ownership and compliance inventory files: `.github/CODEOWNERS` and `THIRD_PARTY_NOTICES.md`.
+- Persistent top-5 high score module (`ScoreManager`) with JSON storage (`scores.json`) including timestamp and optional seed metadata.
+- Splash scene now includes optional seed input for deterministic runs without CLI flags.
+- Sound effects module (`SoundManager`) with persisted on/off preference (`settings.json`).
 
 ### Changed
 - Standardized runtime font asset path to `assets/fonts/Geneva.ttf`.
@@ -65,6 +68,11 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - Windows release packaging now uses explicit PowerShell ZIP staging (exe + assets + DLLs) to avoid CPack failures on `windows-latest`.
 - App CLI now supports runtime performance flags (`--fps`, `--vsync`, `--no-vsync`) in addition to `--seed`.
 - App asset path discovery was extracted from `App.cpp` into a dedicated `AssetResolver` module to reduce UI-layer coupling.
+- App UI now shows `Best: <score>` in the top panel and game-over overlay, backed by persisted high-score data.
+- Playing scene now includes a top-panel `NEW GAME` button and score-delta floating text feedback.
+- Tile visuals were modernized with rounded custom shapes and move-timeline effects (slide lerp, merge pop, spawn fade).
+- Added interactive sound toggle button plus action-based sound cues (slide, merge, spawn, game over, high score).
+- Playing top panel layout now stacks `Best` under `Score` on the left and moves actions into a right-side hamburger menu.
 
 ### Removed
 - Committed build artifacts (`*.o`, local binaries, `.DS_Store`).

@@ -22,6 +22,11 @@ option(SFML_2048_ENABLE_WARNINGS "Enable strict compiler warnings" ON)
 option(SFML_2048_ENABLE_SANITIZERS "Enable AddressSanitizer + UndefinedBehaviorSanitizer" OFF)
 option(SFML_2048_ENABLE_COVERAGE "Enable coverage instrumentation (GCC/Clang)" OFF)
 
+set(SFML_2048_USING_VCPKG OFF)
+if (DEFINED CMAKE_TOOLCHAIN_FILE AND CMAKE_TOOLCHAIN_FILE MATCHES "vcpkg")
+    set(SFML_2048_USING_VCPKG ON)
+endif()
+
 function(enable_project_warnings target_name)
     if (NOT SFML_2048_ENABLE_WARNINGS)
         return()
@@ -69,18 +74,38 @@ function(enable_project_coverage target_name)
     endif()
 endfunction()
 
-find_package(SFML 2.5 COMPONENTS graphics window system CONFIG QUIET)
+find_package(SFML 2.5 COMPONENTS graphics window system audio CONFIG QUIET)
 if (NOT SFML_FOUND)
-    find_package(SFML 2.5 COMPONENTS graphics window system REQUIRED)
+    find_package(SFML 2.5 COMPONENTS graphics window system audio REQUIRED)
 endif()
+
+find_package(nlohmann_json CONFIG QUIET)
+if (NOT nlohmann_json_FOUND)
+    include(FetchContent)
+    FetchContent_Declare(
+        nlohmann_json
+        GIT_REPOSITORY https://github.com/nlohmann/json.git
+        GIT_TAG v3.12.0
+    )
+    FetchContent_MakeAvailable(nlohmann_json)
+endif()
+
+if (SFML_2048_USING_VCPKG)
+    find_package(fmt CONFIG REQUIRED)
+else()
+    find_package(fmt CONFIG QUIET)
+endif()
+find_package(OpenAL QUIET)
 
 add_library(game_core
     src/core/Game.cpp
+    src/core/ScoreManager.cpp
 )
 
 target_include_directories(game_core
     PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
+target_link_libraries(game_core PUBLIC nlohmann_json::nlohmann_json)
 
 enable_project_warnings(game_core)
 enable_project_sanitizers(game_core)
@@ -89,17 +114,45 @@ enable_project_coverage(game_core)
 add_executable(sfml_2048
     src/app/main.cpp
     src/app/AssetResolver.cpp
+    src/app/SoundManager.cpp
     src/app/App.cpp
 )
 
 target_link_libraries(sfml_2048 PRIVATE game_core)
 
 if (TARGET SFML::Graphics)
-    target_link_libraries(sfml_2048 PRIVATE SFML::Graphics SFML::Window SFML::System)
+    target_link_libraries(sfml_2048 PRIVATE SFML::Graphics SFML::Window SFML::System SFML::Audio)
 elseif (TARGET sfml-graphics)
-    target_link_libraries(sfml_2048 PRIVATE sfml-graphics sfml-window sfml-system)
+    target_link_libraries(sfml_2048 PRIVATE sfml-graphics sfml-window sfml-system sfml-audio)
 else()
     target_link_libraries(sfml_2048 PRIVATE ${SFML_LIBRARIES})
+endif()
+
+if (TARGET OpenAL::OpenAL)
+    target_link_libraries(sfml_2048 PRIVATE OpenAL::OpenAL)
+elseif (OPENAL_LIBRARY)
+    target_link_libraries(sfml_2048 PRIVATE ${OPENAL_LIBRARY})
+endif()
+
+if (APPLE)
+    find_library(AUDIOTOOLBOX_FRAMEWORK AudioToolbox)
+    find_library(COREAUDIO_FRAMEWORK CoreAudio)
+    find_library(AUDIOUNIT_FRAMEWORK AudioUnit)
+    find_library(COREFOUNDATION_FRAMEWORK CoreFoundation)
+    find_library(FOUNDATION_FRAMEWORK Foundation)
+
+    foreach(_fw IN ITEMS AUDIOTOOLBOX_FRAMEWORK COREAUDIO_FRAMEWORK AUDIOUNIT_FRAMEWORK
+                        COREFOUNDATION_FRAMEWORK FOUNDATION_FRAMEWORK)
+        if (${_fw})
+            target_link_libraries(sfml_2048 PRIVATE ${${_fw}})
+        endif()
+    endforeach()
+endif()
+
+if (TARGET fmt::fmt)
+    target_link_libraries(sfml_2048 PRIVATE fmt::fmt)
+elseif (TARGET fmt::fmt-header-only)
+    target_link_libraries(sfml_2048 PRIVATE fmt::fmt-header-only)
 endif()
 
 enable_project_warnings(sfml_2048)
