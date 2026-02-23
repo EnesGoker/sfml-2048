@@ -162,8 +162,9 @@ enable_project_coverage(sfml_2048)
 # Keep runtime assets available next to build outputs.
 add_custom_command(TARGET sfml_2048 POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_directory
-            ${CMAKE_SOURCE_DIR}/assets
-            $<TARGET_FILE_DIR:sfml_2048>/assets
+            "${CMAKE_SOURCE_DIR}/assets"
+            "$<TARGET_FILE_DIR:sfml_2048>/assets"
+    VERBATIM
 )
 
 include(GNUInstallDirs)
