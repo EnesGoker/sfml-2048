@@ -78,6 +78,17 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - Committed build artifacts (`*.o`, local binaries, `.DS_Store`).
 - Legacy Makefile with machine-specific Homebrew include/library paths.
 
+## [0.2.1] - 2026-02-23
+
+### Changed
+- CMake post-build asset copy command now uses explicit quoting and `VERBATIM` for safer cross-platform path handling.
+- Manifest and project version metadata are aligned at `0.2.1` (`VERSION` and `vcpkg.json`).
+- README rendering quality was improved (`# sfml-2048` header fix, normalized LF policy via `.gitattributes`, and explicit coverage gate note).
+
+### Legal
+- Replaced `assets/fonts/Geneva.ttf` with OFL-licensed `Inter-Variable.ttf`.
+- Added `assets/fonts/LICENSE-Inter.txt` and updated `THIRD_PARTY_NOTICES.md` accordingly.
+
 ## [0.1.0] - 2026-02-20
 
 ### Added
