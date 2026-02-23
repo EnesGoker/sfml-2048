@@ -1,4 +1,4 @@
-#sfml - 2048
+# sfml-2048
 
 > A classic 2048 clone built with modern C++ - designed from the ground up for testability, cross-platform CI, and clean architecture.
 
@@ -112,6 +112,7 @@ ctest --test-dir build/vcpkg-debug --output-on-failure
 ```
 
 CI runs tests across platforms and also executes sanitizer + coverage jobs.
+Coverage gate: CI enforces `>=80%` line coverage on Linux.
 Full strategy: [docs/testing.md](docs/testing.md)
 
 ---
