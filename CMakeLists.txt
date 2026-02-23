@@ -22,6 +22,11 @@ option(SFML_2048_ENABLE_WARNINGS "Enable strict compiler warnings" ON)
 option(SFML_2048_ENABLE_SANITIZERS "Enable AddressSanitizer + UndefinedBehaviorSanitizer" OFF)
 option(SFML_2048_ENABLE_COVERAGE "Enable coverage instrumentation (GCC/Clang)" OFF)
 
+set(SFML_2048_USING_VCPKG OFF)
+if (DEFINED CMAKE_TOOLCHAIN_FILE AND CMAKE_TOOLCHAIN_FILE MATCHES "vcpkg")
+    set(SFML_2048_USING_VCPKG ON)
+endif()
+
 function(enable_project_warnings target_name)
     if (NOT SFML_2048_ENABLE_WARNINGS)
         return()
@@ -85,7 +90,12 @@ if (NOT nlohmann_json_FOUND)
     FetchContent_MakeAvailable(nlohmann_json)
 endif()
 
-find_package(fmt CONFIG QUIET)
+if (SFML_2048_USING_VCPKG)
+    find_package(fmt CONFIG REQUIRED)
+else()
+    find_package(fmt CONFIG QUIET)
+endif()
+find_package(OpenAL QUIET)
 
 add_library(game_core
     src/core/Game.cpp
@@ -118,10 +128,10 @@ else()
     target_link_libraries(sfml_2048 PRIVATE ${SFML_LIBRARIES})
 endif()
 
-if (TARGET fmt::fmt)
-    target_link_libraries(sfml_2048 PRIVATE fmt::fmt)
-elseif (TARGET fmt::fmt-header-only)
-    target_link_libraries(sfml_2048 PRIVATE fmt::fmt-header-only)
+if (TARGET OpenAL::OpenAL)
+    target_link_libraries(sfml_2048 PRIVATE OpenAL::OpenAL)
+elseif (OPENAL_LIBRARY)
+    target_link_libraries(sfml_2048 PRIVATE ${OPENAL_LIBRARY})
 endif()
 
 if (APPLE)
@@ -137,6 +147,12 @@ if (APPLE)
             target_link_libraries(sfml_2048 PRIVATE ${${_fw}})
         endif()
     endforeach()
+endif()
+
+if (TARGET fmt::fmt)
+    target_link_libraries(sfml_2048 PRIVATE fmt::fmt)
+elseif (TARGET fmt::fmt-header-only)
+    target_link_libraries(sfml_2048 PRIVATE fmt::fmt-header-only)
 endif()
 
 enable_project_warnings(sfml_2048)
