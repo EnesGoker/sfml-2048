@@ -85,6 +85,8 @@ if (NOT nlohmann_json_FOUND)
     FetchContent_MakeAvailable(nlohmann_json)
 endif()
 
+find_package(fmt CONFIG QUIET)
+
 add_library(game_core
     src/core/Game.cpp
     src/core/ScoreManager.cpp
@@ -114,6 +116,27 @@ elseif (TARGET sfml-graphics)
     target_link_libraries(sfml_2048 PRIVATE sfml-graphics sfml-window sfml-system sfml-audio)
 else()
     target_link_libraries(sfml_2048 PRIVATE ${SFML_LIBRARIES})
+endif()
+
+if (TARGET fmt::fmt)
+    target_link_libraries(sfml_2048 PRIVATE fmt::fmt)
+elseif (TARGET fmt::fmt-header-only)
+    target_link_libraries(sfml_2048 PRIVATE fmt::fmt-header-only)
+endif()
+
+if (APPLE)
+    find_library(AUDIOTOOLBOX_FRAMEWORK AudioToolbox)
+    find_library(COREAUDIO_FRAMEWORK CoreAudio)
+    find_library(AUDIOUNIT_FRAMEWORK AudioUnit)
+    find_library(COREFOUNDATION_FRAMEWORK CoreFoundation)
+    find_library(FOUNDATION_FRAMEWORK Foundation)
+
+    foreach(_fw IN ITEMS AUDIOTOOLBOX_FRAMEWORK COREAUDIO_FRAMEWORK AUDIOUNIT_FRAMEWORK
+                        COREFOUNDATION_FRAMEWORK FOUNDATION_FRAMEWORK)
+        if (${_fw})
+            target_link_libraries(sfml_2048 PRIVATE ${${_fw}})
+        endif()
+    endforeach()
 endif()
 
 enable_project_warnings(sfml_2048)
