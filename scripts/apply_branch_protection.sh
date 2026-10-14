@@ -66,6 +66,12 @@ case "$profile" in
       "Build and Test (ubuntu-latest)",
       "Build and Test (macos-latest)",
       "Build and Test (windows-latest)",
+      "Headless Build and Test (ubuntu-latest, Debug)",
+      "Headless Build and Test (ubuntu-latest, Release)",
+      "Headless Build and Test (macos-latest, Debug)",
+      "Headless Build and Test (macos-latest, Release)",
+      "Headless Build and Test (windows-latest, Debug)",
+      "Headless Build and Test (windows-latest, Release)",
       "Sanitizers (ubuntu-latest)",
       "Coverage (ubuntu-latest)"
     ]
@@ -98,6 +104,12 @@ JSON
       "Build and Test (ubuntu-latest)",
       "Build and Test (macos-latest)",
       "Build and Test (windows-latest)",
+      "Headless Build and Test (ubuntu-latest, Debug)",
+      "Headless Build and Test (ubuntu-latest, Release)",
+      "Headless Build and Test (macos-latest, Debug)",
+      "Headless Build and Test (macos-latest, Release)",
+      "Headless Build and Test (windows-latest, Debug)",
+      "Headless Build and Test (windows-latest, Release)",
       "Sanitizers (ubuntu-latest)",
       "Coverage (ubuntu-latest)"
     ]

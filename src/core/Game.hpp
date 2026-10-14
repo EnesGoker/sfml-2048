@@ -1,13 +1,14 @@
 #pragma once
 
-#include <array>
+#include "core/Board.hpp"
+#include "core/GameState.hpp"
+
 #include <cstdint>
 #include <optional>
 #include <random>
+#include <vector>
 
 namespace core2048 {
-
-enum class Direction { Up, Down, Left, Right };
 
 struct SpawnedTile {
     int row;
@@ -19,38 +20,39 @@ struct MoveResult {
     bool moved{false};
     int scoreDelta{0};
     std::optional<SpawnedTile> spawnedTile;
+    std::vector<TileMovement> movements;
+    std::vector<TileMerge> merges;
 };
 
+// Coordinates turns, spawning, score, and independent win/game-over flags; the app owns the UI.
 class Game {
   public:
-    static constexpr int kGridSize = 4;
-    using Grid = std::array<std::array<int, kGridSize>, kGridSize>;
+    static constexpr int kGridSize = Board::kGridSize;
+    static constexpr int kWinningTileValue = 2048;
+    using Grid = Board::Grid;
 
     Game();
     explicit Game(std::uint32_t seed);
 
     void reset();
     void reset(std::uint32_t seed);
+    // Replaces grid, score and flags from the loaded board, without reseeding the RNG.
     void loadState(const Grid &grid, int score = 0);
 
     MoveResult applyMove(Direction dir, bool spawnOnMove = true);
 
     const Grid &getGrid() const noexcept;
     int getScore() const noexcept;
-    bool isGameOver() const;
+    const GameState &getState() const noexcept;
+    bool hasWon() const noexcept;
+    bool isGameOver() const noexcept;
 
   private:
-    struct LineResult {
-        std::array<int, kGridSize> values{};
-        bool moved{false};
-        int scoreDelta{0};
-    };
-
-    static LineResult slideAndMergeLine(const std::array<int, kGridSize> &line);
     std::optional<SpawnedTile> spawnTile();
+    void updateState() noexcept;
 
-    Grid grid_{};
-    int score_{0};
+    Board board_;
+    GameState state_;
     std::mt19937 rng_;
     std::uint32_t seed_{0};
 };

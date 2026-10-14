@@ -1,5 +1,7 @@
 #include "core/Game.hpp"
+#include "core/Board.hpp"
 #include "core/ScoreManager.hpp"
+#include "core/Tile.hpp"
 #include <catch2/catch_test_macros.hpp>
 #include <array>
 #include <chrono>
@@ -13,9 +15,12 @@
 
 namespace {
 
+using core2048::Board;
+using core2048::Cell;
 using core2048::Direction;
 using core2048::Game;
 using core2048::ScoreManager;
+using core2048::Tile;
 
 std::filesystem::path makeUniqueTempFilePath(const std::string &suffix) {
     const auto timestamp = std::chrono::high_resolution_clock::now().time_since_epoch().count();
@@ -35,12 +40,12 @@ constexpr std::array<Direction, 4> kAllDirections = {
     Direction::Right,
 };
 
-bool isPowerOfTwoOrZero(int value) {
+bool isValidTileValueOrZero(int value) {
     if (value == 0) {
         return true;
     }
 
-    return value > 0 && (value & (value - 1)) == 0;
+    return value >= 2 && (value & (value - 1)) == 0;
 }
 
 int sumGrid(const Game::Grid &grid) {
@@ -66,13 +71,12 @@ Game::Grid mirrorHorizontal(const Game::Grid &grid) {
 }
 
 Game::Grid randomValidGrid(std::mt19937 &rng) {
-    std::uniform_int_distribution<int> expDist(0, 11);
+    constexpr std::array values{0, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048};
     Game::Grid grid{};
 
     for (int r = 0; r < Game::kGridSize; ++r) {
         for (int c = 0; c < Game::kGridSize; ++c) {
-            const int exp = expDist(rng);
-            grid[r][c] = (exp == 0) ? 0 : (1 << (exp - 1));
+            grid[r][c] = values[rng() % values.size()];
         }
     }
 
@@ -80,6 +84,206 @@ Game::Grid randomValidGrid(std::mt19937 &rng) {
 }
 
 } // namespace
+
+TEST_CASE("only equal non-empty tiles can merge", "[tile]") {
+    const Tile empty;
+    const Tile two{2};
+    const Tile four{4};
+
+    REQUIRE(empty.isEmpty());
+    REQUIRE_FALSE(two.isEmpty());
+    REQUIRE_FALSE(empty.canMergeWith(empty));
+    REQUIRE_FALSE(empty.canMergeWith(two));
+    REQUIRE_FALSE(two.canMergeWith(empty));
+    REQUIRE_FALSE(two.canMergeWith(four));
+    REQUIRE(two.canMergeWith(Tile{2}));
+    REQUIRE(two.merged().value == 4);
+}
+
+TEST_CASE("board owns cell placement and lists empty cells in row-major order", "[board]") {
+    Board board;
+    REQUIRE(board.emptyCells().size() == 16);
+    REQUIRE((board.emptyCells().front() == Cell{0, 0}));
+    REQUIRE((board.emptyCells().back() == Cell{3, 3}));
+    REQUIRE(board.hasAvailableMoves());
+
+    REQUIRE_FALSE(board.placeTile(Cell{-1, 0}, Tile{2}));
+    REQUIRE_FALSE(board.placeTile(Cell{4, 0}, Tile{2}));
+    REQUIRE_FALSE(board.placeTile(Cell{0, -1}, Tile{2}));
+    REQUIRE_FALSE(board.placeTile(Cell{0, 4}, Tile{2}));
+    REQUIRE_FALSE(board.placeTile(Cell{0, 0}, Tile{}));
+    REQUIRE(board.emptyCells().size() == 16);
+
+    REQUIRE(board.placeTile(Cell{0, 0}, Tile{2}));
+    REQUIRE_FALSE(board.placeTile(Cell{0, 0}, Tile{4}));
+    REQUIRE(board.placeTile(Cell{3, 3}, Tile{4}));
+    REQUIRE(board.getGrid()[0][0] == 2);
+    REQUIRE(board.getGrid()[3][3] == 4);
+    REQUIRE(board.emptyCells().size() == 14);
+    REQUIRE((board.emptyCells().front() == Cell{0, 1}));
+    REQUIRE((board.emptyCells().back() == Cell{3, 2}));
+}
+
+TEST_CASE("standalone board slides and merges in every direction", "[board][move]") {
+    Board::Grid grid{};
+    Board::Grid expected{};
+    Direction direction = Direction::Left;
+
+    SECTION("left") {
+        grid[0] = {0, 2, 2, 4};
+        expected[0] = {4, 4, 0, 0};
+    }
+    SECTION("right") {
+        grid[0] = {0, 2, 2, 4};
+        expected[0] = {0, 0, 4, 4};
+        direction = Direction::Right;
+    }
+    SECTION("up") {
+        grid[1][0] = 2;
+        grid[2][0] = 2;
+        grid[3][0] = 4;
+        expected[0][0] = 4;
+        expected[1][0] = 4;
+        direction = Direction::Up;
+    }
+    SECTION("down") {
+        grid[1][0] = 2;
+        grid[2][0] = 2;
+        grid[3][0] = 4;
+        expected[2][0] = 4;
+        expected[3][0] = 4;
+        direction = Direction::Down;
+    }
+
+    Board board(grid);
+    const auto result = board.applyMove(direction);
+    REQUIRE(result.moved);
+    REQUIRE(result.scoreDelta == 4);
+    REQUIRE(board.getGrid() == expected);
+    REQUIRE(result.merges.size() == 1);
+    REQUIRE(result.merges[0].value == 4);
+}
+
+TEST_CASE("move records include both merge sources and sliding tiles", "[board][move-trace]") {
+    Board::Grid grid{};
+    grid[0] = {2, 2, 0, 8};
+    Board board(grid);
+
+    const auto result = board.applyMove(Direction::Left);
+    REQUIRE(result.moved);
+    REQUIRE(result.scoreDelta == 4);
+    REQUIRE(result.movements.size() == 3);
+    REQUIRE(result.merges.size() == 1);
+    REQUIRE((result.merges[0].cell == Cell{0, 0}));
+    REQUIRE(result.merges[0].value == 4);
+
+    const auto &stationaryMergeSource = result.movements[0];
+    REQUIRE(stationaryMergeSource.value == 2);
+    REQUIRE((stationaryMergeSource.from == Cell{0, 0}));
+    REQUIRE((stationaryMergeSource.to == Cell{0, 0}));
+    REQUIRE(stationaryMergeSource.partOfMerge);
+
+    const auto &movingMergeSource = result.movements[1];
+    REQUIRE(movingMergeSource.value == 2);
+    REQUIRE((movingMergeSource.from == Cell{0, 1}));
+    REQUIRE((movingMergeSource.to == Cell{0, 0}));
+    REQUIRE(movingMergeSource.partOfMerge);
+
+    const auto &slidingTile = result.movements[2];
+    REQUIRE(slidingTile.value == 8);
+    REQUIRE((slidingTile.from == Cell{0, 3}));
+    REQUIRE((slidingTile.to == Cell{0, 1}));
+    REQUIRE_FALSE(slidingTile.partOfMerge);
+
+    Board::Grid expected{};
+    expected[0] = {4, 8, 0, 0};
+    REQUIRE(board.getGrid() == expected);
+}
+
+TEST_CASE("board no-op has no movement or merge records", "[board][move-trace]") {
+    Board::Grid grid{};
+    grid[0] = {2, 4, 8, 16};
+    Board board(grid);
+
+    const auto result = board.applyMove(Direction::Left);
+    REQUIRE_FALSE(result.moved);
+    REQUIRE(result.scoreDelta == 0);
+    REQUIRE(result.movements.empty());
+    REQUIRE(result.merges.empty());
+    REQUIRE(board.getGrid() == grid);
+}
+
+TEST_CASE("board distinguishes full dead grids from available moves", "[board][gameover]") {
+    Board::Grid grid = {
+        std::array<int, 4>{2, 4, 8, 16},
+        std::array<int, 4>{32, 64, 128, 256},
+        std::array<int, 4>{512, 1024, 2, 4},
+        std::array<int, 4>{8, 16, 32, 64},
+    };
+    Board board(grid);
+    REQUIRE_FALSE(board.hasAvailableMoves());
+
+    grid[3][3] = 32;
+    board.loadGrid(grid);
+    REQUIRE(board.hasAvailableMoves());
+
+    grid[3][3] = 0;
+    board.loadGrid(grid);
+    REQUIRE(board.hasAvailableMoves());
+}
+
+TEST_CASE("round score and game-over state stay consistent after loading moves and reset",
+          "[state]") {
+    Game game(0);
+    Game::Grid grid = {
+        std::array<int, 4>{2, 4, 8, 16},
+        std::array<int, 4>{32, 64, 128, 256},
+        std::array<int, 4>{512, 1024, 2, 4},
+        std::array<int, 4>{8, 16, 32, 64},
+    };
+    game.loadState(grid, 42);
+    REQUIRE(game.getState().gameOver);
+    REQUIRE(game.isGameOver());
+    REQUIRE(game.getState().score == 42);
+    REQUIRE(game.getScore() == 42);
+
+    grid[0][0] = 0;
+    game.loadState(grid, 7);
+    REQUIRE_FALSE(game.getState().gameOver);
+    REQUIRE_FALSE(game.isGameOver());
+    const auto lastMove = game.applyMove(Direction::Left);
+    REQUIRE(lastMove.moved);
+    REQUIRE(lastMove.spawnedTile.has_value());
+    REQUIRE(game.getState().gameOver);
+    REQUIRE(game.isGameOver());
+    REQUIRE(game.getState().score == 7);
+    REQUIRE(game.getScore() == 7);
+
+    const auto noOp = game.applyMove(Direction::Left);
+    REQUIRE_FALSE(noOp.moved);
+    REQUIRE(game.getState().gameOver);
+    REQUIRE(game.getState().score == 7);
+
+    grid = {};
+    grid[0] = {2, 2, 0, 0};
+    game.loadState(grid, 5);
+    const auto merge = game.applyMove(Direction::Left, false);
+    REQUIRE(merge.scoreDelta == 4);
+    REQUIRE(merge.movements.size() == 2);
+    REQUIRE(merge.merges.size() == 1);
+    REQUIRE_FALSE(game.getState().gameOver);
+    REQUIRE(game.getState().score == 9);
+    REQUIRE(game.getScore() == 9);
+
+    game.reset(1234);
+    REQUIRE_FALSE(game.getState().won);
+    REQUIRE_FALSE(game.hasWon());
+    REQUIRE_FALSE(game.getState().gameOver);
+    REQUIRE_FALSE(game.isGameOver());
+    REQUIRE(game.getState().score == 0);
+    REQUIRE(game.getScore() == 0);
+    REQUIRE(Board(game.getGrid()).emptyCells().size() == 14);
+}
 
 TEST_CASE("2,2,2,2 left merges to 4,4,0,0 with correct score", "[merge]") {
     Game game(0);
@@ -209,22 +413,28 @@ TEST_CASE("score manager saves and loads score entries", "[score-manager]") {
     cleanup();
 
     ScoreManager writer(filePath);
-    writer.addScore(128, "Enes", "2026-02-21T10:00:00Z");
-    writer.addScore(256, "Inci", "2026-02-21T10:10:00Z");
+    REQUIRE(writer.recordCompletedGame("round-1", 128, "Enes", "2026-02-21T10:00:00Z"));
+    REQUIRE(writer.recordCompletedGame("round-2", 256, "Inci", "2026-02-21T10:10:00Z"));
     REQUIRE(writer.save());
 
     ScoreManager reader(filePath);
     REQUIRE(reader.load());
+    REQUIRE(reader.lastLoadStatus() == core2048::ScoreLoadStatus::LoadedV2);
+    REQUIRE_FALSE(reader.needsMigration());
+    REQUIRE_FALSE(reader.isDirty());
+    REQUIRE(reader.completedGames().size() == 2);
     REQUIRE(reader.topScores().size() == 2);
     REQUIRE(reader.bestScore() == 256);
 
     REQUIRE(reader.topScores()[0].score == 256);
     REQUIRE(reader.topScores()[0].playedAtUtc == "2026-02-21T10:10:00Z");
     REQUIRE(reader.topScores()[0].playerName == "Inci");
+    REQUIRE(reader.topScores()[0].gameId == "round-2");
 
     REQUIRE(reader.topScores()[1].score == 128);
     REQUIRE(reader.topScores()[1].playedAtUtc == "2026-02-21T10:00:00Z");
     REQUIRE(reader.topScores()[1].playerName == "Enes");
+    REQUIRE(reader.topScores()[1].gameId == "round-1");
 
     cleanup();
 }
@@ -239,13 +449,13 @@ TEST_CASE("score manager keeps top 5 entries sorted by score", "[score-manager]"
     cleanup();
 
     ScoreManager manager(filePath);
-    manager.addScore(40, "Aylin", "2026-02-21T10:00:00Z");
-    manager.addScore(90, "Mert", "2026-02-21T10:01:00Z");
-    manager.addScore(10, "Ece", "2026-02-21T10:02:00Z");
-    manager.addScore(70, "Can", "2026-02-21T10:03:00Z");
-    manager.addScore(20, "Sena", "2026-02-21T10:04:00Z");
-    manager.addScore(50, "Arda", "2026-02-21T10:05:00Z");
-    manager.addScore(80, "Selin", "2026-02-21T10:06:00Z");
+    REQUIRE(manager.recordCompletedGame("round-1", 40, "Aylin", "2026-02-21T10:00:00Z"));
+    REQUIRE(manager.recordCompletedGame("round-2", 90, "Mert", "2026-02-21T10:01:00Z"));
+    REQUIRE(manager.recordCompletedGame("round-3", 10, "Ece", "2026-02-21T10:02:00Z"));
+    REQUIRE(manager.recordCompletedGame("round-4", 70, "Can", "2026-02-21T10:03:00Z"));
+    REQUIRE(manager.recordCompletedGame("round-5", 20, "Sena", "2026-02-21T10:04:00Z"));
+    REQUIRE(manager.recordCompletedGame("round-6", 50, "Arda", "2026-02-21T10:05:00Z"));
+    REQUIRE(manager.recordCompletedGame("round-7", 80, "Selin", "2026-02-21T10:06:00Z"));
 
     const std::vector<int> expectedScores = {90, 80, 70, 50, 40};
     REQUIRE(manager.topScores().size() == expectedScores.size());
@@ -253,11 +463,13 @@ TEST_CASE("score manager keeps top 5 entries sorted by score", "[score-manager]"
         REQUIRE(manager.topScores()[i].score == expectedScores[i]);
     }
     REQUIRE(manager.bestScore() == 90);
+    REQUIRE(manager.completedGames().size() == 7);
 
     REQUIRE(manager.save());
 
     ScoreManager reloaded(filePath);
     REQUIRE(reloaded.load());
+    REQUIRE(reloaded.completedGames().size() == 7);
     REQUIRE(reloaded.topScores().size() == expectedScores.size());
     for (std::size_t i = 0; i < expectedScores.size(); ++i) {
         REQUIRE(reloaded.topScores()[i].score == expectedScores[i]);
@@ -274,6 +486,7 @@ TEST_CASE("score manager handles missing and malformed files", "[score-manager]"
     }
     ScoreManager missingManager(missingFilePath);
     REQUIRE(missingManager.load());
+    REQUIRE(missingManager.lastLoadStatus() == core2048::ScoreLoadStatus::Missing);
     REQUIRE(missingManager.topScores().empty());
 
     const auto malformedFilePath = makeUniqueTempFilePath("malformed");
@@ -284,6 +497,7 @@ TEST_CASE("score manager handles missing and malformed files", "[score-manager]"
 
     ScoreManager malformedManager(malformedFilePath);
     REQUIRE_FALSE(malformedManager.load());
+    REQUIRE(malformedManager.lastLoadStatus() == core2048::ScoreLoadStatus::InvalidData);
 
     {
         std::error_code ec;
@@ -307,6 +521,12 @@ TEST_CASE("score manager loads legacy entries without player names", "[score-man
 
     ScoreManager legacyManager(legacyFilePath);
     REQUIRE(legacyManager.load());
+    REQUIRE(legacyManager.lastLoadStatus() == core2048::ScoreLoadStatus::LegacyMigrationPending);
+    REQUIRE(legacyManager.needsMigration());
+    REQUIRE(legacyManager.isDirty());
+    REQUIRE(legacyManager.completedGames().size() == 2);
+    REQUIRE(legacyManager.completedGames()[0].gameId == "legacy-1");
+    REQUIRE(legacyManager.completedGames()[1].gameId == "legacy-2");
     REQUIRE(legacyManager.topScores().size() == 2);
     REQUIRE(legacyManager.topScores()[0].score == 512);
     REQUIRE(legacyManager.topScores()[0].playerName == "Oyuncu");
@@ -376,7 +596,7 @@ TEST_CASE("random valid boards preserve invariants after move without spawn", "[
 
             for (const auto &row : after) {
                 for (const int value : row) {
-                    REQUIRE(isPowerOfTwoOrZero(value));
+                    REQUIRE(isValidTileValueOrZero(value));
                 }
             }
         }

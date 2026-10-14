@@ -10,7 +10,7 @@ else
     exit 1
 fi
 
-files="$(find src tests -type f \( -name '*.cpp' -o -name '*.hpp' \) | sort)"
+files="$(find src tests -type f \( -name '*.cpp' -o -name '*.hpp' -o -name '*.mm' \) | sort)"
 
 if [ -z "$files" ]; then
     echo "No C++ files found for format check"

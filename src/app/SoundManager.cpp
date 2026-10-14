@@ -1,78 +1,14 @@
 #include "app/SoundManager.hpp"
+#include "app/AssetResolver.hpp"
+#include "app/AssetCatalog.hpp"
+#include "app/SettingsStore.hpp"
 
-#include <nlohmann/json.hpp>
-
-#include <fstream>
-#include <system_error>
+#include <utility>
 
 namespace app {
 
-namespace {
-
-using Json = nlohmann::json;
-
-} // namespace
-
-SoundManager::SoundManager(std::filesystem::path soundsDirectory,
-                           std::filesystem::path settingsFilePath)
-    : soundsDirectory_(std::move(soundsDirectory)), settingsFilePath_(std::move(settingsFilePath)) {
-}
-
-bool SoundManager::loadSettings() {
-    std::error_code ec;
-    if (!std::filesystem::exists(settingsFilePath_, ec)) {
-        return !ec;
-    }
-    if (ec) {
-        return false;
-    }
-
-    std::ifstream in(settingsFilePath_);
-    if (!in.is_open()) {
-        return false;
-    }
-
-    Json root;
-    try {
-        in >> root;
-    } catch (const Json::parse_error &) {
-        return false;
-    }
-
-    if (!root.is_object()) {
-        return false;
-    }
-
-    if (root.contains("sound_enabled")) {
-        if (!root["sound_enabled"].is_boolean()) {
-            return false;
-        }
-        enabled_ = root["sound_enabled"].get<bool>();
-    }
-
-    return true;
-}
-
-bool SoundManager::saveSettings() const {
-    const auto parent = settingsFilePath_.parent_path();
-    if (!parent.empty()) {
-        std::error_code ec;
-        std::filesystem::create_directories(parent, ec);
-        if (ec) {
-            return false;
-        }
-    }
-
-    Json root;
-    root["sound_enabled"] = enabled_;
-
-    std::ofstream out(settingsFilePath_);
-    if (!out.is_open()) {
-        return false;
-    }
-
-    out << root.dump(2) << '\n';
-    return static_cast<bool>(out);
+SoundManager::SoundManager(AssetPaths paths, SettingsStore &settings)
+    : paths_(std::move(paths)), settings_(settings) {
 }
 
 bool SoundManager::loadSoundAssets() {
@@ -83,9 +19,10 @@ bool SoundManager::loadSoundAssets() {
         auto &audio = audioForEffect(effect);
         audio.loaded = false;
 
-        const auto path = soundsDirectory_ / effectFileName(effect);
-        if (!audio.buffer.loadFromFile(path.string())) {
-            missingFiles_.push_back(path);
+        const auto relative = std::filesystem::path(effectAssetPath(effect));
+        const auto data = readAssetFile(paths_, relative);
+        if (data.error || !audio.buffer.loadFromMemory(data.bytes.data(), data.bytes.size())) {
+            missingFiles_.push_back(paths_.directory() / relative);
             continue;
         }
 
@@ -98,7 +35,7 @@ bool SoundManager::loadSoundAssets() {
 }
 
 void SoundManager::play(const SoundEffect effect) {
-    if (!enabled_) {
+    if (!settings_.soundEnabled()) {
         return;
     }
 
@@ -112,40 +49,36 @@ void SoundManager::play(const SoundEffect effect) {
 }
 
 bool SoundManager::isEnabled() const noexcept {
-    return enabled_;
+    return settings_.soundEnabled();
 }
 
 void SoundManager::setEnabled(const bool enabled) noexcept {
-    enabled_ = enabled;
+    settings_.setSoundEnabled(enabled);
 }
 
 void SoundManager::toggleEnabled() noexcept {
-    enabled_ = !enabled_;
-}
-
-const std::filesystem::path &SoundManager::settingsFilePath() const noexcept {
-    return settingsFilePath_;
+    settings_.setSoundEnabled(!settings_.soundEnabled());
 }
 
 const std::vector<std::filesystem::path> &SoundManager::missingFiles() const noexcept {
     return missingFiles_;
 }
 
-const char *SoundManager::effectFileName(const SoundEffect effect) {
+const char *SoundManager::effectAssetPath(const SoundEffect effect) {
     switch (effect) {
     case SoundEffect::TileSlide:
-        return "slide.wav";
+        return kSoundAssets[0];
     case SoundEffect::Merge:
-        return "merge.wav";
+        return kSoundAssets[1];
     case SoundEffect::Spawn:
-        return "spawn.wav";
+        return kSoundAssets[2];
     case SoundEffect::GameOver:
-        return "game_over.wav";
+        return kSoundAssets[3];
     case SoundEffect::HighScore:
-        return "high_score.wav";
+        return kSoundAssets[4];
     }
 
-    return "unknown.wav";
+    return "sounds/unknown.wav";
 }
 
 float SoundManager::effectVolume(const SoundEffect effect) {

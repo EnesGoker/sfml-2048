@@ -1,10 +1,10 @@
 #include "core/Game.hpp"
 
 #include <algorithm>
+#include <cstddef>
 #include <cstdint>
 #include <random>
 #include <utility>
-#include <vector>
 
 namespace core2048 {
 
@@ -44,194 +44,88 @@ void Game::reset(std::uint32_t seed) {
     seed_ = seed;
     rng_.seed(seed_);
 
-    for (auto &row : grid_) {
-        row.fill(0);
-    }
-
-    score_ = 0;
+    board_.clear();
+    state_ = {};
     spawnTile();
     spawnTile();
+    updateState();
 }
 
 void Game::loadState(const Grid &grid, int score) {
-    grid_ = grid;
-    score_ = score;
+    board_.loadGrid(grid);
+    state_ = {};
+    state_.score = score;
+    updateState();
 }
 
 const Game::Grid &Game::getGrid() const noexcept {
-    return grid_;
+    return board_.getGrid();
 }
 
 int Game::getScore() const noexcept {
-    return score_;
+    return state_.score;
 }
 
-bool Game::isGameOver() const {
-    for (int r = 0; r < kGridSize; ++r) {
-        for (int c = 0; c < kGridSize; ++c) {
-            if (grid_[r][c] == 0) {
-                return false;
-            }
-        }
-    }
-
-    for (int r = 0; r < kGridSize; ++r) {
-        for (int c = 0; c < kGridSize; ++c) {
-            if (c < (kGridSize - 1) && grid_[r][c] == grid_[r][c + 1]) {
-                return false;
-            }
-
-            if (r < (kGridSize - 1) && grid_[r][c] == grid_[r + 1][c]) {
-                return false;
-            }
-        }
-    }
-
-    return true;
+const GameState &Game::getState() const noexcept {
+    return state_;
 }
 
-Game::LineResult Game::slideAndMergeLine(const std::array<int, kGridSize> &line) {
-    std::vector<int> compact;
-    compact.reserve(kGridSize);
+bool Game::hasWon() const noexcept {
+    return state_.won;
+}
 
-    for (int value : line) {
-        if (value != 0) {
-            compact.push_back(value);
-        }
-    }
+bool Game::isGameOver() const noexcept {
+    return state_.gameOver;
+}
 
-    LineResult result;
-
-    int writeIndex = 0;
-    for (size_t i = 0; i < compact.size(); ++i) {
-        if (i + 1 < compact.size() && compact[i] == compact[i + 1]) {
-            const int mergedValue = compact[i] * 2;
-            result.values[writeIndex++] = mergedValue;
-            result.scoreDelta += mergedValue;
-            ++i;
-            continue;
-        }
-
-        result.values[writeIndex++] = compact[i];
-    }
-
-    result.moved = result.values != line;
-    return result;
+void Game::updateState() noexcept {
+    const auto &grid = board_.getGrid();
+    const bool reachedTarget = std::any_of(grid.begin(), grid.end(), [](const auto &row) {
+        return std::any_of(row.begin(), row.end(),
+                           [](const int value) { return value >= kWinningTileValue; });
+    });
+    // Achievement belongs to the whole round, even after a 2048 tile merges into 4096.
+    state_.won = state_.won || reachedTarget;
+    state_.gameOver = !board_.hasAvailableMoves();
 }
 
 std::optional<SpawnedTile> Game::spawnTile() {
-    std::vector<std::pair<int, int>> emptyCells;
-    emptyCells.reserve(kGridSize * kGridSize);
-
-    for (int r = 0; r < kGridSize; ++r) {
-        for (int c = 0; c < kGridSize; ++c) {
-            if (grid_[r][c] == 0) {
-                emptyCells.emplace_back(r, c);
-            }
-        }
-    }
+    const auto emptyCells = board_.emptyCells();
 
     if (emptyCells.empty()) {
         return std::nullopt;
     }
 
-    const size_t cellIndex =
-        static_cast<size_t>(nextBounded(rng_, static_cast<std::uint32_t>(emptyCells.size())));
+    const std::size_t cellIndex =
+        static_cast<std::size_t>(nextBounded(rng_, static_cast<std::uint32_t>(emptyCells.size())));
     const auto [row, col] = emptyCells[cellIndex];
 
     const int tileValue = (nextBounded(rng_, 10U) == 0U) ? 4 : 2;
 
-    grid_[row][col] = tileValue;
+    if (!board_.placeTile(Cell{row, col}, Tile{tileValue})) {
+        return std::nullopt;
+    }
     return SpawnedTile{row, col, tileValue};
 }
 
 MoveResult Game::applyMove(Direction dir, const bool spawnOnMove) {
-    bool moved = false;
-    int scoreDelta = 0;
-
-    const auto applyToRow = [&](int row, bool reverse) {
-        std::array<int, kGridSize> line{};
-
-        for (int c = 0; c < kGridSize; ++c) {
-            line[c] = reverse ? grid_[row][kGridSize - 1 - c] : grid_[row][c];
-        }
-
-        const LineResult lineResult = slideAndMergeLine(line);
-
-        if (lineResult.moved) {
-            moved = true;
-        }
-
-        scoreDelta += lineResult.scoreDelta;
-
-        for (int c = 0; c < kGridSize; ++c) {
-            if (reverse) {
-                grid_[row][kGridSize - 1 - c] = lineResult.values[c];
-            } else {
-                grid_[row][c] = lineResult.values[c];
-            }
-        }
-    };
-
-    const auto applyToCol = [&](int col, bool reverse) {
-        std::array<int, kGridSize> line{};
-
-        for (int r = 0; r < kGridSize; ++r) {
-            line[r] = reverse ? grid_[kGridSize - 1 - r][col] : grid_[r][col];
-        }
-
-        const LineResult lineResult = slideAndMergeLine(line);
-
-        if (lineResult.moved) {
-            moved = true;
-        }
-
-        scoreDelta += lineResult.scoreDelta;
-
-        for (int r = 0; r < kGridSize; ++r) {
-            if (reverse) {
-                grid_[kGridSize - 1 - r][col] = lineResult.values[r];
-            } else {
-                grid_[r][col] = lineResult.values[r];
-            }
-        }
-    };
-
-    switch (dir) {
-    case Direction::Left:
-        for (int r = 0; r < kGridSize; ++r) {
-            applyToRow(r, false);
-        }
-        break;
-    case Direction::Right:
-        for (int r = 0; r < kGridSize; ++r) {
-            applyToRow(r, true);
-        }
-        break;
-    case Direction::Up:
-        for (int c = 0; c < kGridSize; ++c) {
-            applyToCol(c, false);
-        }
-        break;
-    case Direction::Down:
-        for (int c = 0; c < kGridSize; ++c) {
-            applyToCol(c, true);
-        }
-        break;
-    }
-
-    if (!moved) {
+    auto boardMove = board_.applyMove(dir);
+    if (!boardMove.moved) {
+        updateState();
         return MoveResult{};
     }
 
-    score_ += scoreDelta;
+    state_.score += boardMove.scoreDelta;
 
     MoveResult result;
     result.moved = true;
-    result.scoreDelta = scoreDelta;
+    result.scoreDelta = boardMove.scoreDelta;
+    result.movements = std::move(boardMove.movements);
+    result.merges = std::move(boardMove.merges);
     if (spawnOnMove) {
         result.spawnedTile = spawnTile();
     }
+    updateState();
     return result;
 }
 
