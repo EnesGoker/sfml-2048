@@ -22,6 +22,8 @@ sfml_2048-*.zip
 __MACOSX/
 
 # Tooling / IDE
+CMakeUserPresets.json
+__pycache__/
 .vscode/*.log
 
 # OS files

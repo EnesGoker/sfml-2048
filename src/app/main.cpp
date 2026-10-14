@@ -1,4 +1,5 @@
 #include "app/App.hpp"
+#include "app/RuntimeCheck.hpp"
 
 #include <charconv>
 #include <cstdint>
@@ -18,6 +19,7 @@ void printUsage(std::ostream &out) {
         << "  --vsync            Dikey senkronu ac (varsayilan)\n"
         << "  --no-vsync         Dikey senkronu kapat\n"
         << "  --help             Bu yardim mesajini goster\n";
+    out << "  --check-runtime    Kayitlara yazmadan yollar ve paket dosyalarini denetle (JSON)\n";
 }
 
 bool parseUnsignedValue(const std::string_view text, unsigned int &value) {
@@ -41,6 +43,7 @@ bool parseUnsignedValue(const std::string_view text, unsigned int &value) {
 
 int main(int argc, char *argv[]) {
     app::RunConfig config;
+    bool checkRuntime = false;
 
     for (int i = 1; i < argc; ++i) {
         const std::string_view arg = argv[i];
@@ -48,6 +51,10 @@ int main(int argc, char *argv[]) {
         if (arg == "--help") {
             printUsage(std::cout);
             return 0;
+        }
+        if (arg == "--check-runtime") {
+            checkRuntime = true;
+            continue;
         }
 
         if (arg == "--fps") {
@@ -80,5 +87,11 @@ int main(int argc, char *argv[]) {
         return 2;
     }
 
+    if (checkRuntime) {
+        const auto result = app::inspectRuntime();
+        std::cout << result.report.dump(2, ' ', false, nlohmann::json::error_handler_t::replace)
+                  << '\n';
+        return result.success ? 0 : 1;
+    }
     return app::run(config);
 }

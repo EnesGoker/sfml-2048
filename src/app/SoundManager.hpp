@@ -1,5 +1,7 @@
 #pragma once
 
+#include "app/AppPaths.hpp"
+
 #include <SFML/Audio/Sound.hpp>
 #include <SFML/Audio/SoundBuffer.hpp>
 
@@ -8,14 +10,14 @@
 
 namespace app {
 
+class SettingsStore;
+
 enum class SoundEffect { TileSlide, Merge, Spawn, GameOver, HighScore };
 
 class SoundManager {
   public:
-    SoundManager(std::filesystem::path soundsDirectory, std::filesystem::path settingsFilePath);
-
-    bool loadSettings();
-    bool saveSettings() const;
+    // SettingsStore outlives this manager; preferences and disk I/O belong to the store.
+    SoundManager(AssetPaths paths, SettingsStore &settings);
 
     bool loadSoundAssets();
     void play(SoundEffect effect);
@@ -24,7 +26,6 @@ class SoundManager {
     void setEnabled(bool enabled) noexcept;
     void toggleEnabled() noexcept;
 
-    const std::filesystem::path &settingsFilePath() const noexcept;
     const std::vector<std::filesystem::path> &missingFiles() const noexcept;
 
   private:
@@ -34,15 +35,14 @@ class SoundManager {
         bool loaded{false};
     };
 
-    static const char *effectFileName(SoundEffect effect);
+    static const char *effectAssetPath(SoundEffect effect);
     static float effectVolume(SoundEffect effect);
 
     EffectAudio &audioForEffect(SoundEffect effect);
     const EffectAudio &audioForEffect(SoundEffect effect) const;
 
-    std::filesystem::path soundsDirectory_;
-    std::filesystem::path settingsFilePath_;
-    bool enabled_{true};
+    AssetPaths paths_;
+    SettingsStore &settings_;
     std::vector<std::filesystem::path> missingFiles_;
 
     EffectAudio tileSlide_;
