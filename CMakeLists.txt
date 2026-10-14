@@ -391,6 +391,7 @@ if (SFML_2048_BUILD_APP)
         )
         install(RUNTIME_DEPENDENCY_SET sfml_2048_runtime_deps
             PRE_EXCLUDE_REGEXES "api-ms-" "ext-ms-"
+                "$<$<PLATFORM_ID:Windows>:^hvsifiletrust\\.dll$>"
             POST_EXCLUDE_REGEXES ".*/[Ss][Yy][Ss][Tt][Ee][Mm]32/.*\\.dll" ".*/usr/lib/.*" ".*/System/Library/.*"
             RUNTIME DESTINATION . COMPONENT Runtime
             LIBRARY DESTINATION . COMPONENT Runtime
