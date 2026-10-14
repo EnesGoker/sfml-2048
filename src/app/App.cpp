@@ -426,9 +426,12 @@ int run(const RunConfig &config) {
     };
 
     ui::AccessibilityBridge accessibility;
+#if defined(__APPLE__)
+    // The native accessibility adapter is AppKit-only; other platforms use the stub.
     if (accessibility.supported() && !accessibility.attach(window.getSystemHandle())) {
         std::cerr << "Uyarı: erişilebilirlik kontrolleri bağlanamadı.\n";
     }
+#endif
     const auto accessibilitySnapshot = [&] {
         ui::AccessibilitySnapshot snapshot;
         snapshot.generation = accessibilityGeneration;

@@ -164,7 +164,7 @@ void requireReport(const app::RuntimeCheckResult &result, bool success) {
 const Json &resourceEntry(const Json &report, std::string_view relative) {
     const auto &entries = report.at("resources");
     const auto found = std::find_if(entries.begin(), entries.end(), [&](const auto &entry) {
-        return entry.at("relative_path") == relative;
+        return entry.at("relative_path") == Json(relative);
     });
     REQUIRE(found != entries.end());
     return *found;
@@ -184,7 +184,7 @@ void requireError(const Json &report, std::string_view domain, std::string_view 
                   const fs::path &path) {
     const auto &errors = report.at("errors");
     const auto found = std::find_if(errors.begin(), errors.end(), [&](const auto &error) {
-        return error.at("domain") == domain && error.at("code") == code &&
+        return error.at("domain") == Json(domain) && error.at("code") == Json(code) &&
                error.at("path") == pathText(path);
     });
     REQUIRE(found != errors.end());

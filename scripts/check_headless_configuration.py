@@ -290,7 +290,13 @@ class ConfigurationCheck:
                     "assets", "_CPack_Packages", "sfml_2048*", "sfml-2048*.zip", "sfml-2048*.tar*")
         for root in roots:
             for pattern in patterns:
-                require(not list(root.glob(pattern)), "Desktop/package output in headless build: " + str(root / pattern))
+                # Visual Studio's top-level solution is build metadata, not a desktop output.
+                matches = [path for path in root.glob(pattern)
+                           if not (root == self.build and
+                                   self.values.get("CMAKE_GENERATOR", "").startswith("Visual Studio ") and
+                                   path.name == "sfml_2048.sln" and
+                                   path.is_file() and not path.is_symlink())]
+                require(not matches, "Desktop/package output in headless build: " + str(root / pattern))
         return {"install_scripts_checked": [str(script) for script in installers],
                 "desktop_output_directories_checked": sorted(map(str, roots))}
 

@@ -134,9 +134,8 @@ bool ScoreManager::updateBestScore(const int score) noexcept {
 bool ScoreManager::recordCompletedGame(std::string gameId, const int score, std::string playerName,
                                        std::optional<std::string> playedAtUtc) {
     if (gameId.empty() || score < 0 ||
-        std::any_of(
-            completedGames_.begin(), completedGames_.end(),
-            [&gameId](const ScoreEntry &entry) { return entry.gameId == gameId; })) {
+        std::any_of(completedGames_.begin(), completedGames_.end(),
+                    [&gameId](const ScoreEntry &entry) { return entry.gameId == gameId; })) {
         return false;
     }
 

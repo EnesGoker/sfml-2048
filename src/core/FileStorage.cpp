@@ -182,7 +182,7 @@ FileReadResult readFileSnapshotImpl(const std::filesystem::path &path) {
         return result;
     }
     NativeFileHandle owner(descriptor);
-    struct stat information{};
+    struct stat information {};
     if (::fstat(descriptor, &information) != 0) {
         return result;
     }

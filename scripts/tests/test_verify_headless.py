@@ -272,7 +272,9 @@ class HeadlessIntegrationTests(unittest.TestCase):
         result, report = self.run_fixture()
         self.assertEqual(result.returncode, 1)
         self.assertEqual(report["stages"][-1]["name"], "actual-headers")
-        self.assertIn("resolved path", report["error"])
+        # Compilers may report the canonical path directly or retain the symlink name.
+        self.assertIn("Desktop dependency in actual compiler dependency", report["error"])
+        self.assertIn(str(actual.resolve()), report["error"])
 
     def test_missing_compiler_dependency_evidence_is_rejected(self):
         wrapper = self.directory / "compiler-wrapper"
