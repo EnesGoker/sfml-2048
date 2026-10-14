@@ -59,7 +59,7 @@ class TempTree {
     }
 
     fs::path directory(const fs::path &relative) const {
-        const auto path = root_ / relative;
+        const auto path = (root_ / relative).make_preferred();
         fs::create_directories(path);
         return path;
     }
